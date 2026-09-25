@@ -45,6 +45,10 @@ turned on on Claude's advice). These override anything below that conflicts with
   the setting behind it, and has no feature that depends on it. A command ColorOS refuses without that switch
   is reported as unsupported and the feature is dropped. The switch's state is a health probe (R-11.7 #6).
 
+  *Owner exception (2026-09-25):* droidforge may name **USB debugging** and **Wireless debugging** - the adb
+  connection switches it cannot work without (connection help, wireless pairing). It never names, suggests or
+  writes any other developer option.
+
 - **P7 Minimal footprint.** A feature touches only the exact package, setting or app-op the user chose.
   No side changes, no "repair" toggles, no bulk passes over every installed package.
 - **P8 Command allowlist.** The executor only sends device commands that match a template in
@@ -327,5 +331,8 @@ are withdrawn by the owner (2026-09-25).
 | Time settings | none written; screens only opened |
 | Reboot check | offered after risky plans |
 | Legacy cnrom_fix.py | stripped of language/config features now; retired when droidforge v1 ships |
+| Developer options wording | USB debugging and Wireless debugging may be named (adb connection); every other developer option stays forbidden (P0 exception) |
+| Self-changing settings | A reviewed ignore-list of settings the ROM changes on its own (screen brightness, next alarm): logged and reported, never a stop reason. Display/UI keys (P9b) can never be on it; it grows only from Phase 9 findings |
+| Publishing v1 | PR to main, then tag v1.0.0 on main |
 | v1 scope (2026-09-25, later) | v1 is published with Phases 0-6 and 8; root mode (Phase 7) moves to v2; the real-device validation (Phase 9) is deferred and runs after v1. The V-status commands stay marked V until then |
 | Incident 2026-09-25 | ColorOS "Disable permission monitoring" switch (turned on on Claude's advice) broke Settings; Reset all settings turned it off. Owner confirmed. Owner order: never break anything, never change what doesn't need changing -> P0, P7-P16, R-11.7 #6. Initially blamed on the legacy language setter (kept forbidden as defence in depth). Owner: droidforge must not change anything it does not need to and must not be able to cause this again -> P7-P12, R-3 rewrite, R-11.7/11.8 |

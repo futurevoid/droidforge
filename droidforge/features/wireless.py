@@ -3,7 +3,7 @@
 type ip:port + the 6-digit code shown on the phone. Paired phones are remembered in config.json.
 
 The pairing and connect commands only touch the PC's adb (host:adb-pairing); they are still previewed and
-confirmed. How the phone side is opened is worded in PAIRING_HINT (see the open question under P5.1).
+confirmed. Naming Wireless debugging is the owner's P0 exception (SPEC); no other developer option is named.
 """
 
 from __future__ import annotations
@@ -17,9 +17,11 @@ from typing import List, Optional, Tuple
 
 from droidforge.engine.plan import Plan, Step
 
-PAIRING_HINT = ("On the phone, open the wireless pairing screen ('Pair device with QR code') and scan this code. "
-                "Phone and PC must be on the same Wi-Fi.")
-CODE_HINT = "Or choose 'Pair device with pairing code' on the phone and type the ip:port and 6-digit code here."
+# SPEC P0 owner exception: USB debugging / Wireless debugging may be named (they are how adb connects at all).
+PAIRING_HINT = ("On the phone: Developer options > Wireless debugging > 'Pair device with QR code', then scan this "
+                "code. Phone and PC must be on the same Wi-Fi.")
+CODE_HINT = ("Or: Wireless debugging > 'Pair device with pairing code', and type the ip:port and 6-digit code "
+             "here.")
 ADDR_RE = re.compile(r"^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$")
 
 Row = Tuple[str, str, str]   # (service name, type, ip:port)

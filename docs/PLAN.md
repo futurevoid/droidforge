@@ -36,10 +36,8 @@ the health gate is not done.
   `cmd overlay`, `pm clear` on system apps); a made-up command is refused.
 - [x] **P1.2** (P10, R-11.8) `engine/snapshot.py`: take/diff of settings, package states, app locales, IME,
   launcher, global-config fields. Accept: diff on sim finds exactly the injected changes, nothing else.
-  - Open question (owner): a real phone changes some settings on its own (auto-brightness `screen_brightness`,
-    `next_alarm_formatted`, ...). P10 as written flags every undeclared change, so these would stop a plan on a
-    real device. Implemented strictly for now (no ignore-list). Phase 9 will show which keys are noisy - may
-    droidforge then keep a reviewed ignore-list of volatile keys (never containing P9b display/UI keys)?
+  - Answered (owner, 2026-09-25): yes - a reviewed ignore-list (`snapshot.VOLATILE_KEYS`: screen brightness,
+    next alarm), logged and reported, never P9b keys; it grows only from Phase 9 findings.
 - [x] **P1.3** (P0, P11, R-11.7) `engine/health.py`: probes + baseline compare. Accept: `break_ui()` on the sim is
   reported as 2+ regressions; a healthy sim reports none; sim `permission_monitoring=True` is reported with the
   "turn it off" message even when the baseline already had it on.
@@ -126,12 +124,9 @@ the health gate is not done.
 
 ## Phase 5 - Tools & connectivity
 
-- [ ] **P5.1** `features/wireless.py` QR pairing (TUI QR widget from `qrcode` matrix, half-block rendering),
+- [x] **P5.1** `features/wireless.py` QR pairing (TUI QR widget from `qrcode` matrix, half-block rendering),
   mDNS polling, pair + connect, code fallback, remembered devices (R-2.2).
-  - Open question (owner): pairing only works with Developer options > Wireless debugging on, but P0 says
-    droidforge never tells the user to enable any developer-option switch (the same applies to USB debugging in
-    the "no device" message). (a) allow naming USB / Wireless debugging only, or (b) never name any developer
-    option? Built with neutral wording until answered; task stays open.
+  - Answered (owner, 2026-09-25): (a) - USB debugging and Wireless debugging may be named; P0 exception in SPEC.
 - [x] **P5.2** `features/shizuku.py` install from GitHub release + auto-start on connect + status (R-2.3).
   - "Auto-start on every connect" is done as an ASK on every connect (P14 overrides: nothing runs unconfirmed).
 - [x] **P5.3** `tools/scrcpy.py` (R-9.1) with pacman hint. **P5.4** `tools/logcat.py` streaming pane (R-9.2).

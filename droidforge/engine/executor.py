@@ -55,6 +55,7 @@ class RunReport:
     pre_failing: List[Probe] = field(default_factory=list)
     regressions: List[Regression] = field(default_factory=list)
     undeclared: List[Change] = field(default_factory=list)
+    ignored: List[Change] = field(default_factory=list)   # VOLATILE_KEYS changes (logged, never a stop reason)
     batches_total: int = 0
     batches_run: int = 0
     undo_plan: Optional[Plan] = None
@@ -176,7 +177,10 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         changes = snapshot.diff(base_s, now_s)
         now_h = rep.final_health = health.run(device)
         recovered = health.recovered_keys(base_h, now_h, healthy_ref)
-        rep.undeclared = snapshot.undeclared(changes, declared + recovered)
+        rep.ignored = snapshot.volatile(changes)
+        for c in rep.ignored:
+            log.trace(f"ignored (changes by itself): {c}")
+        rep.undeclared = snapshot.undeclared(changes, declared + recovered + list(snapshot.VOLATILE_KEYS))
         regs = health.compare(base_h, now_h, declared, reference=healthy_ref)
         pre = {p.name for p in base_h.failing}
         rep.regressions = [r for r in regs if r.probe not in pre]

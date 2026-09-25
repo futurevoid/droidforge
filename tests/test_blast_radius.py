@@ -112,3 +112,26 @@ def test_a_change_away_from_healthy_still_stops(sim, phone: FakePhone) -> None:
     phone.side_effects[rf"disable-user --user 0 {TELEMETRY[0]}$"] = lambda ph: setattr(ph.config, "density", 400)
     rep = executor.run(disable_plan(TELEMETRY[:1]), sim, yes)
     assert rep.status == "stopped" and "config:density" in {c.key for c in rep.undeclared}
+
+
+# ---------------------------------------------------------------- owner decision: reviewed ignore-list
+def test_volatile_keys_are_logged_not_a_stop(sim, phone: FakePhone) -> None:
+    phone.side_effects[rf"disable-user --user 0 {TELEMETRY[0]}$"] = \
+        lambda ph: ph.settings["system"].__setitem__("screen_brightness", "40")
+    rep = executor.run(disable_plan(TELEMETRY[:1]), sim, yes)
+    assert rep.status == "done" and [c.key for c in rep.ignored] == ["setting:system:screen_brightness"]
+
+
+def test_volatile_list_never_contains_display_or_forbidden_keys() -> None:
+    import re
+
+    from droidforge.engine import guard
+    from droidforge.engine.snapshot import VOLATILE_KEYS
+    display = next(rx for rx, why in guard.FORBIDDEN if "P9b" in why and "settings" in rx)
+    for key in VOLATILE_KEYS:
+        kind, ns, name = key.split(":")
+        assert kind == "setting"
+        cmd = f"settings put {ns} {name} 1"
+        assert not re.search(display, cmd, re.I), f"{key} is a display/UI key (P9b) - never ignorable"
+        for rx, why in guard.FORBIDDEN:
+            assert not re.search(rx, cmd, re.I), f"{key} matches Forbidden: {why}"

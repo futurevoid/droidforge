@@ -180,6 +180,20 @@ def diff(before: Snapshot, after: Snapshot) -> List[Change]:
     return changes
 
 
+# Owner decision (P1.2): settings the ROM changes on its own. Changes are logged and reported but never stop a plan.
+# Reviewed list only - it grows from Phase 9 findings - and it can never contain a display/UI key (P9b):
+# tests/test_blast_radius.py enforces that.
+VOLATILE_KEYS = {
+    "setting:system:screen_brightness": "auto-brightness adjusts it all the time",
+    "setting:system:screen_brightness_float": "auto-brightness (float variant)",
+    "setting:system:next_alarm_formatted": "the clock app rewrites it when alarms fire",
+}
+
+
+def volatile(changes: Iterable[Change]) -> List[Change]:
+    return [c for c in changes if c.key in VOLATILE_KEYS]
+
+
 def covered(key: str, declared: Iterable[str]) -> bool:
     """Is `key` declared (exactly or by an fnmatch pattern such as `pkg:com.x:*`)?"""
     return any(key == d or fnmatchcase(key, d) for d in declared)
