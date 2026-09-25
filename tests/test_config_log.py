@@ -139,3 +139,22 @@ def test_console_sink_is_ascii() -> None:
     out = buf.getvalue()
     assert out.isascii() and "[*] device language:" in out
     assert ascii_safe("é") == "\\xe9"
+
+
+def test_ultra_caps_output_on_screen_but_debug_log_has_all(tmp_path: Path) -> None:
+    from droidforge.log import OUTPUT_LINES_AT_3
+    dbg = tmp_path / "d.log"
+    lg = Logger(3, dbg)
+    lines = collect(lg)
+    lg.result(0, 5, "\n".join(f"line{i}" for i in range(5000)), "")
+    assert sum(ln.kind == "out" for ln in lines) == OUTPUT_LINES_AT_3
+    assert any(ln.kind == "more" and "4800 more" in ln.text for ln in lines)
+    assert dbg.read_text().count("out | line") == 5000
+
+
+def test_quiet_result_logs_no_body(tmp_path: Path) -> None:
+    dbg = tmp_path / "d.log"
+    lg = Logger(3, dbg)
+    lines = collect(lg)
+    lg.result(0, 5, "QUJD\n" * 100, "", quiet=True)
+    assert [ln.kind for ln in lines] == ["exit"] and "QUJD" not in dbg.read_text()

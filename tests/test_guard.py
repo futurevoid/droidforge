@@ -70,7 +70,7 @@ def test_rules_are_unique_and_named() -> None:
 EXAMPLES: Dict[str, str] = {
     "getprop": "getprop ro.build.version.sdk",
     "pm-list": "pm list packages -d",
-    "app-label": "unzip -p '/data/app/~~a==/com.x-b==/base.apk' resources.arsc | base64",
+    "app-label": "unzip -p '/data/app/~~a==/com.x-b==/base.apk' resources.arsc | head -c 8388608 | base64",
     "focused": "dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'",
     "resolve-home": "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
     "dumpsys-package": "dumpsys package com.heytap.market",

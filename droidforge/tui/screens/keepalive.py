@@ -50,7 +50,9 @@ class KeepAliveSection(Section):
 
     def show(self, res: Tuple[List[str], Dict[str, str], List[str], Dict[str, str]]) -> None:
         pkgs, status, presets, names = res
-        self.query_one(AppPicker).load(pkgs, status, names)
+        picker = self.query_one(AppPicker)
+        picker.load(pkgs, status, names)
+        self.dapp.load_names(pkgs, picker.set_names)
         self.presets = presets
         self.query_one("#pp-presets-btn", Button).label = (
             "Grant presets: " + ", ".join(CATALOG[k].name for k in presets)) if presets else "No preset apps installed"

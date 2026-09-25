@@ -88,20 +88,20 @@ class Device:
                                             for a in args]
         return " ".join(parts)
 
-    def adb(self, args: List[str], timeout: float = 30, plumbing: bool = False) -> RunResult:
+    def adb(self, args: List[str], timeout: float = 30, plumbing: bool = False, quiet: bool = False) -> RunResult:
         """Raw adb call with logging. Callers: read(), sh(), and connection-level queries (get-state)."""
         self.log.command(self.pretty(args), plumbing=plumbing)
         t0 = time.monotonic()
         r = self.backend.run(self._prefix() + list(args), timeout=timeout)
         ms = r.ms or int((time.monotonic() - t0) * 1000)
-        self.log.result(r.exit, ms, r.out, r.err, plumbing=plumbing)
+        self.log.result(r.exit, ms, r.out, r.err, plumbing=plumbing, quiet=quiet)
         return r
 
-    def read(self, cmd: str, timeout: float = 30, plumbing: bool = True) -> RunResult:
-        """Run a read-only shell command (checked against the read allowlist)."""
+    def read(self, cmd: str, timeout: float = 30, plumbing: bool = True, quiet: bool = False) -> RunResult:
+        """Run a read-only shell command (checked against the read allowlist). `quiet`: bulk data, not logged."""
         if self.read_guard is not None:
             self.read_guard(cmd, self)
-        return self.adb(["shell", cmd], timeout=timeout, plumbing=plumbing)
+        return self.adb(["shell", cmd], timeout=timeout, plumbing=plumbing, quiet=quiet)
 
     def out(self, cmd: str, plumbing: bool = True) -> str:
         return self.read(cmd, plumbing=plumbing).out.strip()

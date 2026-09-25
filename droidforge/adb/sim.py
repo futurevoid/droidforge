@@ -614,6 +614,9 @@ class SimBackend:
             out, code = r.out, r.exit
             for stage in pipe[1:]:
                 toks = shlex.split(stage)
+                if len(toks) == 3 and toks[:2] == ["head", "-c"]:
+                    out = out[:int(toks[2])]   # latin-1 text: one char per byte
+                    continue
                 if toks == ["base64"]:
                     raw = base64.b64encode(out.encode("latin-1")).decode()
                     out, code = "\n".join(raw[i:i + 76] for i in range(0, len(raw), 76)), 0

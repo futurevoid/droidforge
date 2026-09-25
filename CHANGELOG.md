@@ -2,8 +2,13 @@
 
 ## 1.1.1 - 2026-09-25
 
-- App names are no longer loaded automatically: reading them from every APK used too much time and phone
-  resources and broke package loading. Package lists, pickers and previews work as in 1.0.x again.
+- Fixed: the TUI froze while adb was working. Command output on screen is capped (200 lines per command at
+  ultra verbosity, the debug log keeps everything), the log pane writes a bounded number of lines per refresh,
+  and the debug log is written once per command instead of once per line.
+- Fixed: app names made package loading slow and heavy. Lists and pickers now show at once and names fill in
+  afterwards in the background, a few apps at a time, without holding up other actions; every read is size-capped
+  (`head -c`), its data is never printed to the log, the plan preview reads at most 15 new names, and names are
+  cached per APK version.
 - `doctor` no longer checks the "Disable permission monitoring" switch (owner decision).
 
 ## 1.1.0 - 2026-09-25

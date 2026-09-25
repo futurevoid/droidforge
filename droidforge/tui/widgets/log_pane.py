@@ -13,6 +13,10 @@ STYLE = {"cmd": "cyan", "exit": "dim", "out": "dim", "more": "dim", "err": "yell
          "info": "cyan", "ok": "green", "warn": "yellow", "error": "bold red"}
 
 
+LINES_PER_TICK = 250   # per 0.1 s tick
+MAX_PENDING = 2000
+
+
 class LogPane(RichLog):
     """Thread-safe: the sink only appends to a deque; a timer drains it on the UI thread."""
 
@@ -32,7 +36,16 @@ class LogPane(RichLog):
         self.set_interval(0.1, self.drain)
 
     def drain(self) -> None:
+        """UI thread, every 0.1 s: write a bounded number of lines so a flood of output can never freeze the
+        screen; beyond MAX_PENDING the oldest waiting lines are dropped (the debug log keeps everything)."""
         from rich.text import Text
-        while self.pending:
+        dropped = 0
+        while len(self.pending) > MAX_PENDING:
+            self.pending.popleft()
+            dropped += 1
+        if dropped:
+            self.write(Text(f"    ... {dropped} log line(s) skipped to keep the screen responsive - full text in "
+                            "the debug log", style="dim"))
+        for _ in range(min(len(self.pending), LINES_PER_TICK)):
             line = self.pending.popleft()
             self.write(Text(line.text, style=STYLE.get(line.kind, "")))

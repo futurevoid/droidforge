@@ -11,12 +11,14 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from textual import work
+from textual.worker import get_current_worker
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import ContentSwitcher, Footer, Label, ListItem, ListView
 
 from droidforge import config
+from droidforge.adb import labels
 from droidforge.adb.device import Device, list_devices
 from droidforge.adb.real import RealBackend
 from droidforge.adb.sim import FakePhone
@@ -78,6 +80,9 @@ SECTION_CLASSES = {"dashboard": DashboardSection, "language": LanguageSection, "
                    "debloat": DebloatSection, "privacy": PrivacySection, "firewall": FirewallSection,
                    "apps": AppsSection, "keepalive": KeepAliveSection, "tools": ToolsSection, "audit": AuditSection,
                    "history": HistorySection}
+
+
+NAMES_CHUNK = 6   # apps per background name read before the phone is released again
 
 
 class DroidforgeApp(App[None]):
@@ -337,6 +342,29 @@ class DroidforgeApp(App[None]):
             LOG.error(f"read failed: {e}")
             return
         self.call_from_thread(done, res)
+
+    def load_names(self, pkgs: List[str], done: Callable[[Dict[str, str]], None]) -> None:
+        """App names for a list that is already on screen: read in the background, NAMES_CHUNK apps at a time,
+        releasing the phone between chunks so plans and other reads are never held up. A newer call cancels an
+        older one. Names are cached per APK, so this is only slow the first time."""
+        if self.session is not None and pkgs:
+            self._names_worker(list(pkgs), done)
+
+    @work(thread=True, exclusive=True, group="names")
+    def _names_worker(self, pkgs: List[str], done: Callable[[Dict[str, str]], None]) -> None:
+        worker = get_current_worker()
+        s = self.session
+        if s is None:
+            return
+        with self._dev_lock:
+            paths = labels.apk_paths(s.device)
+        for i in range(0, len(pkgs), NAMES_CHUNK):
+            if worker.is_cancelled or self.session is not s:
+                return
+            with self._dev_lock:
+                names = labels.lookup(s.device, pkgs[i:i + NAMES_CHUNK], paths=paths)
+            if names:
+                self.call_from_thread(done, names)
 
     def confirm_blocking(self, plan: Plan) -> Confirmation:
         """The executor's confirm hook (runs in the worker thread): block until the preview is dismissed."""

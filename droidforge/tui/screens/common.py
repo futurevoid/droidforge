@@ -51,6 +51,10 @@ class AppPicker(Vertical):
         finally:
             self.call_after_refresh(self._done_redrawing)
 
+    def set_names(self, names: Dict[str, str]) -> None:
+        self.names.update(names)
+        self._redraw()
+
     def _prompt(self, p: str) -> Text:
         t = Text()
         if self.names.get(p):

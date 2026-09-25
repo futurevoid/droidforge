@@ -47,7 +47,9 @@ class FirewallSection(Section):
         if missing:
             msg += f"\nRules missing (reboot): {', '.join(missing)}"
         self.query_one("#fw-status", Static).update(msg)
-        self.query_one(AppPicker).load(apps, None, names)
+        picker = self.query_one(AppPicker)
+        picker.load(apps, None, names)
+        self.dapp.load_names(apps, picker.set_names)
 
     def _picked(self) -> List[str]:
         extra = self.query_one("#fw-pkg", Input).value.strip()
