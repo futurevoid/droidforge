@@ -84,7 +84,7 @@ the health gate is not done.
   keep-list, guarded phrase. Accept: port of legacy mock scenarios (protected package, suspend refused, etc.).
 - [x] **P2.4** `features/backup.py` (R-11.3): session-start snapshot saved to disk (evidence + diff baseline);
   restore only of keys droidforge changed, via history. No blanket restore.
-- [ ] **P2.5** "English setup" guide (replaces legacy menu `e`): step 1 opens Language settings and waits for the
+- [x] **P2.5** "English setup" guide (replaces legacy menu `e`): step 1 opens Language settings and waits for the
   user; step 2 offers Gboard + Chinese-IME switch (R-3.4); step 3 lists apps still showing Chinese via the
   focused-app watcher and offers per-app language for those non-system apps only. Each step is its own
   confirmed, health-gated plan.

@@ -224,7 +224,37 @@ def sc_backup_restore(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return backup.restore_plan(dev, h, path)
 
 
+def sc_setup_language(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features.english_setup import EnglishSetup
+    return EnglishSetup(dev).language_plan()
+
+
+def sc_setup_keyboard(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features.english_setup import EnglishSetup
+    return EnglishSetup(dev).keyboard_plan()
+
+
+def sc_setup_chinese(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features.english_setup import EnglishSetup
+    _gboard_current(phone)
+    return EnglishSetup(dev).chinese_keyboards_plan()
+
+
+def sc_setup_apps(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features.english_setup import EnglishSetup
+    setup = EnglishSetup(dev)
+    w = setup.start_watch()
+    for p in ("com.tencent.mm", "com.android.settings", "com.eg.android.AlipayGphone"):
+        phone.focused = p
+        w.poll()
+    return setup.apps_plan("en-US,ar-EG")
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.english_setup.EnglishSetup.language_plan": sc_setup_language,
+    "droidforge.features.english_setup.EnglishSetup.keyboard_plan": sc_setup_keyboard,
+    "droidforge.features.english_setup.EnglishSetup.chinese_keyboards_plan": sc_setup_chinese,
+    "droidforge.features.english_setup.EnglishSetup.apps_plan": sc_setup_apps,
     "droidforge.features.backup.restore_plan": sc_backup_restore,
     "droidforge.features.debloat.disable_plan": sc_debloat_disable,
     "droidforge.features.debloat.remove_plan": sc_debloat_remove,
