@@ -118,7 +118,7 @@ the health gate is not done.
   F-Droid index, Mozilla - verify Firefox Nightly URL and record it in COMMANDS.md), local folder incl. splits.
 - [x] **P4.6** `features/defaults.py` swaps + roles (R-6.2) with telephony safeguards + IMS/VoLTE notice.
 - [x] **P4.7** `features/keepalive.py` (R-6.3) and `features/powerperms.py` (R-6.4).
-- [ ] **P4.8** `features/region.py` (R-3.3): opens Regional preferences and Date & time only - no writes.
+- [x] **P4.8** `features/region.py` (R-3.3): opens Regional preferences and Date & time only - no writes.
   Accept: guard test proves the module can only emit `am start` reads. (Tweaks removed - P9b.)
 - [ ] **P4.9** `features/ota.py` fingerprint change -> diff vs profile -> prompt re-apply (R-2.5, P14);
   `notify.py` (R-2.7).

@@ -366,7 +366,19 @@ def sc_powerperms_preset(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return powerperms.preset_plan(dev, ["tasker"])
 
 
+def sc_regional(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import region
+    return region.regional_plan(dev)
+
+
+def sc_datetime(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import region
+    return region.datetime_plan(dev)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.region.regional_plan": sc_regional,
+    "droidforge.features.region.datetime_plan": sc_datetime,
     "droidforge.features.keepalive.keepalive_plan": sc_keepalive,
     "droidforge.features.keepalive.remove_plan": sc_keepalive_remove,
     "droidforge.features.powerperms.grant_plan": sc_powerperms,
