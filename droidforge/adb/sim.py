@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from droidforge.adb.backend import EXIT_NOT_FOUND, RunResult
-from droidforge.data.device_keys import PERMISSION_MONITORING_KEY, PERMISSION_MONITORING_NS
+from droidforge.data.device_keys import PERMISSION_MONITORING_PROP
 
 SIM_SERIAL = "SIMNEO8CN01"
 SHIZUKU = "moe.shizuku.privileged.api"
@@ -185,11 +185,11 @@ class FakePhone:
 
     @property
     def permission_monitoring_disabled(self) -> bool:
-        return self.settings[PERMISSION_MONITORING_NS].get(PERMISSION_MONITORING_KEY) == "1"
+        return self.props.get(PERMISSION_MONITORING_PROP) == "false"
 
     @permission_monitoring_disabled.setter
     def permission_monitoring_disabled(self, on: bool) -> None:
-        self.settings[PERMISSION_MONITORING_NS][PERMISSION_MONITORING_KEY] = "1" if on else "0"
+        self.props[PERMISSION_MONITORING_PROP] = "false" if on else "true"
 
     def set_device_locales(self, tags: List[str]) -> None:
         """What the user does in Settings > Language (droidforge never does this)."""

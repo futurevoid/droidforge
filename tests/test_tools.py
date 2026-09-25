@@ -110,7 +110,7 @@ def test_shell_pane(sim, phone: FakePhone) -> None:
     assert r.result.ok and not phone.packages["com.heytap.market"].enabled
     e = h.entries()[-1]
     assert e.label == "manual - no automatic undo" and e.undo == [] and not e.undoable
-    for bad in ("settings put global droidforge_placeholder_permission_monitoring_disabled 1",
+    for bad in ("setprop persist.sys.permission.enable false",
                 "settings put system font_scale 1.3", "pm grant x android.permission.CHANGE_CONFIGURATION"):
         r = executor.run_manual(bad, sim, h, confirmed=True)
         assert r.refused and r.result is None

@@ -87,7 +87,7 @@ FORBIDDEN: Tuple[Tuple[str, str], ...] = (
     (r"\bpm\s+clear\b", "pm clear is not needed by any feature"),
     (r"\bsettings\s+reset\b", "blanket settings restores are forbidden - use Settings > Reset all settings"),
     (r"(?:" + _SETW + r"|" + _PROPW + r")\S*(?:permission_monitor|system_optimi|development_settings|adb_enabled"
-     r"|placeholder_permission_monitoring)",
+     r"|permission\.enable)",
      "developer options / the permission-monitoring switch are never written (P0)"),
     (_SETW + r"\S*(?:font|color|colour|theme|icon|density|refresh|animation|animator|wallpaper|night_mode|dark_"
      r"|navigation_mode|accessibility_display|high_text_contrast|ux_icon|material)",

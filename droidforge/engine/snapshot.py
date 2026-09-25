@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional
 
 from droidforge.adb import parse
 from droidforge.adb.batch import batch_read
+from droidforge.data.device_keys import PERMISSION_MONITORING_PROP
 
 if TYPE_CHECKING:  # pragma: no cover
     from droidforge.adb.device import Device
@@ -35,6 +36,7 @@ if TYPE_CHECKING:  # pragma: no cover
 NAMESPACES = ("system", "secure", "global")
 HOME_CMD = "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 CONFIG_CMD = "dumpsys activity | grep -m1 mGlobalConfig"
+WATCHED_PROPS = (PERMISSION_MONITORING_PROP,)
 ROLES = ("android.app.role.BROWSER", "android.app.role.SMS", "android.app.role.DIALER")
 
 
@@ -51,6 +53,7 @@ class Snapshot:
     roles: Dict[str, str] = field(default_factory=dict)
     launcher: str = ""
     config: Dict[str, str] = field(default_factory=dict)
+    props: Dict[str, str] = field(default_factory=dict)                 # WATCHED_PROPS
 
     # ------------------------------------------------------------------ flatten
     def flat(self) -> Dict[str, str]:
@@ -81,6 +84,8 @@ class Snapshot:
         f["launcher"] = self.launcher
         for k, v in self.config.items():
             f[f"config:{k}"] = v
+        for k, v in self.props.items():
+            f[f"prop:{k}"] = v
         return f
 
     # ------------------------------------------------------------------ persistence
@@ -158,6 +163,7 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
     s.imes = parse.ime_ids(device.read("ime list -s").out)
     s.launcher = parse.last_component(device.read(HOME_CMD).out)
     s.config = parse.global_config(device.read(CONFIG_CMD).out)
+    s.props = {p: device.out(f"getprop {p}").strip() for p in WATCHED_PROPS}
     device.log.trace(f"snapshot: {sum(len(t) for t in s.settings.values())} settings, {len(s.packages)} packages, "
                      f"{len(s.details)} detailed, {len(s.app_locales)} app locales, {len(s.imes)} IMEs")
     return s

@@ -62,7 +62,7 @@ def test_regressions_vs_last_healthy_baseline(sim, phone: FakePhone) -> None:
 
 
 def test_unknown_permission_switch_is_not_called_healthy(sim, phone: FakePhone) -> None:
-    del phone.settings["global"]["droidforge_placeholder_permission_monitoring_disabled"]
+    del phone.props["persist.sys.permission.enable"]
     text = "\n".join(doctor.run(sim, None, None).lines())
     assert "[??  ] 'Disable permission monitoring' switch: unknown" in text
 

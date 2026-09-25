@@ -76,7 +76,7 @@ def test_break_ui_shows_in_diff(sim, phone: FakePhone) -> None:
     phone.break_ui()
     keys = {c.key for c in snapshot.diff(a, snapshot.take(sim))}
     assert "config:mMaterialColor" in keys
-    assert any("permission_monitoring" in k for k in keys)
+    assert "prop:persist.sys.permission.enable" in keys
 
 
 def test_side_effect_is_the_only_extra_change(sim, phone: FakePhone) -> None:
