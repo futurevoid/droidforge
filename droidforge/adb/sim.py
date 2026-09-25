@@ -138,6 +138,8 @@ class FakePhone:
         self.crashes: List[str] = []
         self.root: Optional[str] = None               # None | magisk | ksu | apatch
         self.shizuku_running = False
+        self.mdns: List[Tuple[str, str, str]] = []    # (name, service type, ip:port) seen by `adb mdns services`
+        self.pairing: Optional[Tuple[str, str]] = None  # (name, password) the phone scanned from the QR code
         self.proc_net: List[str] = []
         self.focused = "com.android.launcher"
         self.deviceidle: Set[str] = set()             # user battery-optimisation whitelist
@@ -446,6 +448,16 @@ class SimBackend:
             return _ok()
         if args == ["wait-for-device"]:
             return _ok()
+        if args == ["mdns", "check"]:
+            return _ok("mdns daemon version [Openscreen discovery 0.0.0]")
+        if args == ["mdns", "services"]:
+            return _ok("List of discovered mdns services\n" + "\n".join("\t".join(r) for r in self.phone.mdns))
+        if args[0] == "pair" and len(args) == 3:
+            if self.phone.pairing and args[2] == self.phone.pairing[1]:
+                return _ok(f"Successfully paired to {args[1]} [guid=adb-{self.phone.serial}]")
+            return _fail("Failed: Wrong password or connection was dropped.", 1)
+        if args[0] == "connect" and len(args) == 2:
+            return _ok(f"connected to {args[1]}")
         if args[0] in ("install", "install-multiple"):
             return self._install([a for a in args[1:] if not a.startswith("-")])
         return self._unsupported("adb " + " ".join(args))

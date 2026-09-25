@@ -111,6 +111,9 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
     reboot check) be judged against an earlier plan's pre-plan state."""
     log = device.log
     rep = RunReport(plan=plan, batches_total=len(plan.batches()))
+    if plan.steps and all(s.host and s.all_touches() and all(t.startswith("host:") for t in s.all_touches())
+                          for s in plan.steps):
+        return _run_host_only(plan, device, confirm, rep, dry_run)
 
     # 1. guard + locked-package check - before anything is shown as runnable
     try:
@@ -355,3 +358,32 @@ def run_manual(cmd: str, device: "Device", history: Optional["History"] = None, 
             step=step, requested=step, ok=res.result.ok, exit=res.result.exit, out=res.result.out,
             err=res.result.err), device)
     return res
+
+
+def _run_host_only(plan: Plan, device: "Device", confirm: ConfirmHook, rep: RunReport, dry_run: bool) -> RunReport:
+    """Plans that only touch the PC (pairing, pacman, self-update): guard + confirm, no phone to health-check."""
+    try:
+        for s in plan.steps:
+            guard.check(s, None)
+    except guard.GuardError as e:
+        rep.status, rep.error = "refused", str(e)
+        return rep
+    ok, why = _typed_ok(plan, confirm(plan))
+    if not ok:
+        rep.status, rep.error = ("cancelled", "") if why == "cancelled" else ("refused", why)
+        return rep
+    for s in plan.steps:
+        if dry_run:
+            device.log.info(f"(dry-run) host {s.cmd}")
+            rep.results.append(StepResult(step=s, requested=s, ok=True, dry_run=True))
+            continue
+        r = run_host(s.cmd, device)
+        res = StepResult(step=s, requested=s, ok=succeeded(r), exit=r.exit, out=r.out, err=r.err, attempts=[s.cmd],
+                         applied=[s] if succeeded(r) else [])
+        rep.results.append(res)
+        if not res.ok:
+            device.log.error(f"{s.label} -> {r.err or r.out or 'failed'}")
+            break
+    rep.status = "dry-run" if dry_run else "done"
+    rep.batches_run = rep.batches_total
+    return rep

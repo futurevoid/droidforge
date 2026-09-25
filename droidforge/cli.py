@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional
 
@@ -18,6 +19,15 @@ from droidforge.session import ConnectError, Session, open_session
 
 # tests replace this to hand the CLI a prepared simulated phone
 SESSION_FACTORY: Callable[..., Session] = open_session
+
+def _host_factory(simulate: bool) -> "Device":
+    from droidforge.adb.device import Device
+    from droidforge.adb.real import RealBackend
+    from droidforge.adb.sim import SimBackend
+    return Device(SimBackend() if simulate else RealBackend(), None, log=LOG)
+
+
+HOST_FACTORY: Callable[[bool], "Device"] = _host_factory
 
 EXPERT_BANNER = ("!!! EXPERT MODE: locked packages (SystemUI, telephony, Play services, WebView, UI infrastructure, "
                  "current keyboard/launcher, UAD Unsafe) can be selected. One package per batch, type its full "
@@ -102,6 +112,10 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     rb = sub.add_parser("rollback", help="undo an entry and everything newer")
     rb.add_argument("id")
     sub.add_parser("uad-update", help="download the UAD-NG package list (about 1.6 MB, GitHub)")
+    pr = sub.add_parser("pair", help="pair a phone over Wi-Fi (QR code, or --code IP:PORT CODE)")
+    pr.add_argument("--code", nargs=2, metavar=("IP:PORT", "CODE"))
+    pr.add_argument("--connect", metavar="IP:PORT", help="connect address after pairing with a code")
+    pr.add_argument("--wait", type=float, default=120, help="seconds to wait for the phone to scan the QR code")
 
 
 def preview_lines(plan: Plan) -> List[str]:
@@ -313,6 +327,39 @@ def cmd_history(s: Session) -> int:
     return 0
 
 
+def cmd_pair(args: argparse.Namespace, host: "Device", sleep: Callable[[float], None] = time.sleep) -> int:
+    from droidforge.adb import hostcmd
+    from droidforge.engine import executor
+    from droidforge.features import wireless
+    if args.code:
+        plan = wireless.pair_plan(args.code[0], args.code[1], args.connect)
+    else:
+        p = wireless.new_pairing()
+        print(wireless.render_ascii(wireless.qr_matrix(p.payload)))
+        print(ascii_safe(wireless.PAIRING_HINT))
+        addr = connect = None
+        for _ in range(max(1, int(args.wait / 2))):
+            rows = wireless.parse_services(hostcmd.mdns_services(host))
+            addr = wireless.find_pairing(rows, p.name)
+            if addr:
+                connect = wireless.find_connect(rows, addr.split(":")[0])
+                break
+            sleep(2)
+        if not addr:
+            print("The phone did not show up. " + wireless.CODE_HINT.replace("here", "with --code"))
+            return 1
+        plan = wireless.pair_plan(addr, p.password, connect)
+    rep = executor.run(plan, host, cli_confirm(args.yes))
+    ok = rep.status == "done" and all(r.ok for r in rep.results)
+    for r in rep.results:
+        print(ascii_safe(f"[{'ok  ' if r.ok else 'FAIL'}] {r.step.label}" + ("" if r.ok else f" -> {r.err or r.out}")))
+    if ok and plan.steps[-1].cmd.startswith("adb connect"):
+        addr = plan.steps[-1].cmd.split()[-1]
+        wireless.remember(addr)
+        print(f"Connected. Use: droidforge --serial {addr}")
+    return 0 if ok else 2
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     _setup_logging(args.verbosity)
@@ -324,6 +371,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.expert:
             print(("\033[41;97m" + EXPERT_BANNER + "\033[0m") if sys.stderr.isatty() else EXPERT_BANNER,
                   file=sys.stderr)
+        if args.command == "pair":
+            return cmd_pair(args, HOST_FACTORY(args.simulate))
         try:
             s = SESSION_FACTORY(simulate=args.simulate, serial=args.serial, expert=args.expert,
                                 dry_run=args.dry_run)

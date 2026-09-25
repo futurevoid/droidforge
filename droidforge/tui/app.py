@@ -17,7 +17,7 @@ from textual.containers import Horizontal
 from textual.widgets import ContentSwitcher, Footer, Label, ListItem, ListView
 
 from droidforge import config
-from droidforge.adb.device import list_devices
+from droidforge.adb.device import Device, list_devices
 from droidforge.adb.real import RealBackend
 from droidforge.adb.sim import FakePhone
 from droidforge.engine import executor
@@ -92,6 +92,7 @@ class DroidforgeApp(App[None]):
         Binding("d", "toggle_dry_run", "Dry-run"),
         Binding("ctrl+t", "change_theme", "Theme"),
         Binding("ctrl+e", "toggle_expert", "Expert mode"),
+        Binding("p", "pair", "Pair (Wi-Fi)"),
     ]
 
     def __init__(self, simulate: bool = False, serial: Optional[str] = None, expert: bool = False,
@@ -158,6 +159,33 @@ class DroidforgeApp(App[None]):
         self.query_one(ContentSwitcher).current = sid
         if self.session is not None:
             self.sections[sid].refresh_from(self)
+
+    def host_device(self) -> "Device":
+        """A device handle without a serial, for PC-side adb commands (pairing works before any phone)."""
+        from droidforge.adb.device import Device
+        from droidforge.adb.real import RealBackend
+        from droidforge.adb.sim import SimBackend
+        if self.simulate:
+            return Device(SimBackend(self.session.phone if self.session else self.phone), None, log=LOG)
+        return Device(RealBackend(), None, log=LOG)
+
+    def action_pair(self) -> None:
+        from droidforge.tui.screens.pairing import PairingScreen
+        self.push_screen(PairingScreen(self.host_device()), lambda addr: self.connect(addr) if addr else None)
+
+    def run_host_plan(self, host: "Device", plan: Plan, on_done: Optional[PlanDone] = None) -> None:
+        """PC-only plans (pairing) - previewed like every plan, before any phone is connected."""
+        self._host_worker(host, plan, on_done)
+
+    @work(thread=True, group="plan", exclusive=True)
+    def _host_worker(self, host: "Device", plan: Plan, on_done: Optional[PlanDone]) -> None:
+        rep = executor.run(plan, host, self.confirm_blocking, dry_run=self.dry_run)
+        self.call_from_thread(self._plan_finished_host, rep, on_done)
+
+    def _plan_finished_host(self, rep: RunReport, on_done: Optional[PlanDone]) -> None:
+        self.last_report = rep
+        if on_done is not None:
+            on_done(rep)
 
     def action_toggle_log(self) -> None:
         self.query_one(LogPane).toggle_class("hidden")

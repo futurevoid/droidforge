@@ -404,7 +404,20 @@ def sc_launch(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return activities.launch_plan(dev, "com.android.phone/.settings.RadioInfo")
 
 
+def sc_pair(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import wireless
+    phone.pairing = ("droidforge-x", "abcdef1234")
+    return wireless.pair_plan("192.168.1.20:37123", "abcdef1234", "192.168.1.20:40001")
+
+
+def sc_connect(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import wireless
+    return wireless.connect_plan("192.168.1.20:40001")
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.wireless.pair_plan": sc_pair,
+    "droidforge.features.wireless.connect_plan": sc_connect,
     "droidforge.features.tools.activities.curated_plan": sc_curated,
     "droidforge.features.tools.activities.launch_plan": sc_launch,
     "droidforge.features.tools.scrcpy.install_plan": sc_scrcpy_install,

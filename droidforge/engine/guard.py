@@ -230,7 +230,7 @@ RULES: Tuple[Rule, ...] = (
     R("adb-install", rf"adb -s {SERIAL} install(?:-multiple)? -r {HOSTPATH}(?: {HOSTPATH})*",
       ((AP, "Install APK(s) (host)"),), True, True),
     R("mdns", r"adb mdns (?:check|services)", ((WS, "mDNS discovery (host)"),), host=True),
-    R("pair", rf"adb (?:pair {IPPORT} [0-9]{{6}}|connect {IPPORT})", ((WS, "Pair / connect (host)"),), True, True,
+    R("pair", rf"adb (?:pair {IPPORT} [A-Za-z0-9]{{6,16}}|connect {IPPORT})", ((WS, "Pair / connect (host)"),), True, True,
       touches=("host:adb-pairing",)),
     R("pacman", r"sudo pacman -S (?P<hp>android-tools|scrcpy)", ((HO, "adb / scrcpy install"),), True, True,
       touches=("host:pkg:{hp}",)),

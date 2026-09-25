@@ -105,3 +105,10 @@ def stream(cmd: str, device: "Device") -> Stream:
                             encoding="utf-8", errors="replace")
     assert proc.stdout is not None
     return Stream(iter(proc.stdout), proc)
+
+
+def mdns_services(device: "Device") -> str:
+    """`adb mdns services` (guard-checked host read) - wireless pairing discovery."""
+    cmd = "adb mdns services"
+    _check_tool(cmd)
+    return device.backend.run(["mdns", "services"], timeout=10).out
