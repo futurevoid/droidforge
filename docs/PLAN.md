@@ -19,7 +19,7 @@ the health gate is not done.
   always full.
 - [x] **P0.3** (R-2.6) `adb/backend.py`, `adb/real.py` (timeouts -> 124, missing adb -> 127 + pacman hint), `adb/device.py`
   (getprop cache, package-list cache + invalidation, `sh/out`), `adb/batch.py`. Accept: tests with a stub backend.
-- [ ] **P0.4** `adb/sim.py` FakePhone + SimBackend covering every command in COMMANDS.md sections Device info,
+- [x] **P0.4** `adb/sim.py` FakePhone + SimBackend covering every command in COMMANDS.md sections Device info,
   Packages, Language, Keyboard, Health probes (others added in their phases). Seed = PACKAGES.md packages + a
   few Google apps, `system` flags, an `mGlobalConfig=` line modelled on the owner's real dump, Settings /
   permission resolve-activity results. Fault injection: `side_effects`, `break_ui()`. Unknown command -> 127.

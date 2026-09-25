@@ -154,13 +154,13 @@ Nothing here. All display/UI commands moved to "Forbidden".
 |---|---|---|
 | Settings home activity | `cmd package resolve-activity --brief -a android.settings.SETTINGS` | L (owner's log: `com.android.settings/com.oplus.settings.feature.homepage.OplusSettingsHomepageActivity`) |
 | Permission UI | `cmd package resolve-activity --brief -a android.intent.action.MANAGE_APP_PERMISSIONS` | L (owner: `com.android.permissioncontroller/com.oplusos.permissioncontroller.permission.ui.ManagePermissionsActivityTrampoline`) |
-| Global configuration | `dumpsys activity \| grep -m1 mGlobalConfig` (parse locale, fontScale, density, night, ColorOS `mMaterialColor`, `mUxIconConfig`, `mFontVariationSettings`, `mDarkMode*`) | L (owner's dump) |
+| Global configuration | `dumpsys activity \| grep -m1 mGlobalConfig` (parse locale, fontScale, density, night, ColorOS `mMaterialColor`, `mUxIconConfig`, `mFontVariationSettings`, `mDarkMode*`) | L (owner's dump); the simulator's line is modelled on AOSP `Configuration.toString` + `mOplusExtraConfiguration{...}` - re-seed from the Neo 8 in Phase 9 |
 | Settings snapshot | `settings list system`, `settings list secure`, `settings list global` | L |
 | Night mode / font | `cmd uimode night`, `settings get system font_scale` | L |
 | IME / launcher | `settings get secure default_input_method`, `cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME` | L |
 | Crashes | `logcat -b crash -d -t 200` | L |
 | Process alive | `pidof com.android.systemui`, `pidof com.android.settings` | L |
-| Permission-monitoring switch off | read the setting/prop behind Developer options > "Disable permission monitoring" (key unknown yet: found in Phase 9 by the owner flipping it while droidforge diffs `settings list system/secure/global` + `getprop`; droidforge only reads) | V |
+| Permission-monitoring switch off | read the setting/prop behind Developer options > "Disable permission monitoring" (key unknown yet: found in Phase 9 by the owner flipping it while droidforge diffs `settings list system/secure/global` + `getprop`; droidforge only reads). Until then the simulator exposes it as the placeholder `settings get global droidforge_placeholder_permission_monitoring_disabled` (`1` = switch on); on a real phone that read returns `null` and the probe reports "unknown", never "healthy" | V |
 | Open Developer options (for the user to turn the switch off) | `am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS` | S |
 
 ## Forbidden (P9) - never implement, never add to the allowlist
