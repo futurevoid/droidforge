@@ -382,3 +382,66 @@ async def test_selected_marker_is_visible(df_home: Path) -> None:
         await pilot.pause()
         cell = pt.query_one("#pkg-table").get_cell_at((0, 0))
         assert str(cell) == "[x]"
+
+
+# ---------------------------------------------------------------- P3.4 themes, verbosity, dry-run
+async def test_hacker_theme_registered_and_persisted(df_home: Path) -> None:
+    app = DroidforgeApp(simulate=True, show_limits=False)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        assert "hacker" in app.available_themes and "textual-light" in app.available_themes
+        app.theme = "hacker"
+        await pilot.pause()
+    assert config.Config().get("theme") == "hacker"
+    app2 = DroidforgeApp(simulate=True, show_limits=False)
+    async with app2.run_test(size=SIZE) as pilot:
+        await settle(app2, pilot)
+        assert app2.theme == "hacker"
+
+
+async def test_theme_switcher_key_opens_palette(df_home: Path) -> None:
+    from textual.command import CommandPalette
+    app = DroidforgeApp(simulate=True, show_limits=False)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+t")
+        await pilot.pause()
+        assert isinstance(app.screen, CommandPalette)
+
+
+async def test_unknown_saved_theme_falls_back(df_home: Path) -> None:
+    config.Config().set("theme", "no-such-theme")
+    app = DroidforgeApp(simulate=True, show_limits=False)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        assert app.theme == "textual-dark"
+
+
+async def test_verbosity_key_cycles_and_persists(df_home: Path) -> None:
+    from droidforge.log import LOG
+    LOG.verbosity = 3
+    app = DroidforgeApp(simulate=True, show_limits=False)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        await pilot.press("v")
+        assert LOG.verbosity == 1 and config.Config().get("verbosity") == 1
+        assert app.query_one(DeviceBar).fields["verbosity"] == "verbosity 1"
+        await pilot.press("v")
+        await pilot.press("v")
+        assert LOG.verbosity == 3
+
+
+async def test_dry_run_toggle_sends_nothing(df_home: Path) -> None:
+    phone = neo8_cn()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        await pilot.press("d")
+        assert app.dry_run and app.query_one(DeviceBar).fields["dry_run"] == "DRY-RUN"
+        before = phone.state()
+        app.run_plan(debloat.disable_plan(app.session.device, ["com.heytap.market"], UAD_SAMPLE))
+        await run_previewed(app, pilot)
+        assert app.last_report.status == "dry-run" and phone.state() == before
+        assert app.session.history.entries()[-1].dry_run
+        await pilot.press("d")
+        assert not app.dry_run

@@ -98,7 +98,7 @@ the health gate is not done.
   debloat action and cancels -> sim unchanged.
 - [x] **P3.3** Screens for Phase 2 features: Dashboard (device info, doctor), Language, Keyboard, Debloat,
   Backup & History (undo entry, rollback). Accept: pilot navigates each and runs one action on sim.
-- [ ] **P3.4** (R-12.2) Themes: built-in list + custom "hacker" (black / green / amber) via `textual.theme.Theme`,
+- [x] **P3.4** (R-12.2) Themes: built-in list + custom "hacker" (black / green / amber) via `textual.theme.Theme`,
   switcher (key `ctrl+t` + command palette), persisted. Verbosity toggle key `v`, dry-run toggle.
 
 - [ ] **P3.5** (R-12.5) Breakage alert modal + dashboard list + `droidforge fix`: triggered by executor

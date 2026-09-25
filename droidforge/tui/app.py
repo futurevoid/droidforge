@@ -23,7 +23,7 @@ from droidforge.adb.sim import FakePhone
 from droidforge.engine import executor
 from droidforge.engine.executor import RunReport
 from droidforge.engine.plan import Confirmation, Plan
-from droidforge.log import LOG
+from droidforge.log import LEVEL_NAMES, LOG
 from droidforge.session import ConnectError, Session, open_session
 from droidforge.features.doctor import DoctorReport
 from droidforge.tui.screens.base import Section
@@ -33,6 +33,7 @@ from droidforge.tui.screens.history import HistorySection
 from droidforge.tui.screens.keyboard import KeyboardSection
 from droidforge.tui.screens.language import LanguageSection
 from droidforge.tui.screens.modals import EXPERT_WARNING, ConfirmBox, DevicePicker, LimitsNote, MessageBox
+from droidforge.tui.themes import DEFAULT_THEME, HACKER
 from droidforge.tui.widgets.device_bar import DeviceBar, ExpertBanner
 from droidforge.tui.widgets.log_pane import LogPane
 from droidforge.tui.widgets.plan_preview import PlanPreview
@@ -62,6 +63,9 @@ class DroidforgeApp(App[None]):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("l", "toggle_log", "Log pane"),
+        Binding("v", "cycle_verbosity", "Verbosity"),
+        Binding("d", "toggle_dry_run", "Dry-run"),
+        Binding("ctrl+t", "change_theme", "Theme"),
         Binding("ctrl+e", "toggle_expert", "Expert mode"),
     ]
 
@@ -100,6 +104,10 @@ class DroidforgeApp(App[None]):
         return SECTION_CLASSES.get(sid, Section)(sid, label)
 
     def on_mount(self) -> None:
+        self.register_theme(HACKER)
+        wanted = self.cfg.get("theme") or DEFAULT_THEME
+        self.theme = wanted if wanted in self.available_themes else DEFAULT_THEME
+        self.watch(self, "theme", self._theme_changed, init=False)
         pane = self.query_one(LogPane)
         LOG.add_sink(pane.sink)
         self._sink = pane.sink
@@ -124,6 +132,22 @@ class DroidforgeApp(App[None]):
 
     def action_toggle_log(self) -> None:
         self.query_one(LogPane).toggle_class("hidden")
+
+    def _theme_changed(self, theme: str) -> None:
+        self.cfg.set("theme", theme)   # R-12.2: the choice is persisted
+
+    def action_cycle_verbosity(self) -> None:
+        v = LOG.cycle()
+        self.cfg.set("verbosity", v)
+        self.refresh_bar()
+        self.notify(f"Verbosity {v}: {LEVEL_NAMES[v]}")
+
+    def action_toggle_dry_run(self) -> None:
+        self.dry_run = not self.dry_run
+        if self.session is not None:
+            self.session.dry_run = self.dry_run
+        self.refresh_bar()
+        self.notify("Dry-run ON - plans are shown and logged, nothing is sent" if self.dry_run else "Dry-run off")
 
     def action_toggle_expert(self) -> None:
         """R-4.3: expert mode toggle in the header; red banner while on. Turning it on asks first."""
