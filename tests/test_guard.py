@@ -90,6 +90,8 @@ EXAMPLES: Dict[str, str] = {
     "fw-get": "cmd connectivity get-package-networking-enabled com.heytap.market",
     "role-get": "cmd role get-role-holders --user 0 android.app.role.SMS",
     "standby-get": "am get-standby-bucket com.whatsapp",
+    "deviceidle-get": "dumpsys deviceidle whitelist",
+    "open-app-info": "am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.whatsapp",
     "dumpsys-packages": "dumpsys package packages",
     "appops-get": "cmd appops get com.whatsapp",
     "proc-net": "su -c 'cat /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6'",

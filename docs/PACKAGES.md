@@ -120,4 +120,4 @@ Patterns: `sogou`, `sohu`, `baidu`, `iflytek`, `qqpinyin`, `tencent`, `pinyin`, 
 | Google Photos / Files / Messages / Phone / Calendar / Contacts / Keep | see table above | Play |
 | Shizuku | moe.shizuku.privileged.api | GitHub releases RikkaApps/Shizuku; Play |
 | Play Integrity checker | gr.nikolasspyr.integritycheck (VERIFY) | Play |
-| Tasker / SystemUI Tuner / Automate / MacroDroid (power-perm presets) | net.dinglisch.android.taskerm / com.zacharee1.systemuituner / com.llamalab.automate / com.arlosoft.macrodroid | presets apply only if installed |
+| Tasker / SystemUI Tuner / Automate / MacroDroid (power-perm presets: WRITE_SECURE_SETTINGS; READ_LOGS / DUMP / usage access via "custom") | net.dinglisch.android.taskerm / com.zacharee1.systemuituner / com.llamalab.automate / com.arlosoft.macrodroid | presets apply only if installed |

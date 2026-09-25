@@ -69,6 +69,9 @@ class Snapshot:
                 f[f"appop:{p}:{op}"] = mode
             if "fw" in d:
                 f[f"fw:{p}"] = d["fw"]
+            if "deviceidle" in d:
+                f[f"deviceidle:{p}"] = d["deviceidle"]
+                f[f"standby:{p}"] = d.get("standby", "")
         for p, loc in self.app_locales.items():
             f[f"applocale:{p}"] = loc
         for i in self.imes:
@@ -132,12 +135,15 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
     disabled = device.packages("-d")
     s.packages = {p: {"installed": p in installed, "enabled": p not in disabled} for p in sorted(present)}
     fw = firewall_supported(device) if scope else False
+    idle = parse.deviceidle_whitelist(device.out("dumpsys deviceidle whitelist")) if scope else {}
     for p in scope:
         if p not in present:
             continue
         dump = device.read(f"dumpsys package {p}").out
         s.details[p] = {"suspended": parse.suspended(dump), "perms": parse.runtime_perms(dump),
                         "appops": parse.appops(device.read(f"cmd appops get {p}").out)}
+        s.details[p]["deviceidle"] = idle.get(p, "")
+        s.details[p]["standby"] = parse.standby_bucket(device.out(f"am get-standby-bucket {p}"))
         if fw:
             v = device.out(f"cmd connectivity get-package-networking-enabled {p}")
             if v in ("true", "false"):
@@ -164,7 +170,7 @@ def diff(before: Snapshot, after: Snapshot) -> List[Change]:
     both = set(before.details) & set(after.details)
     changes = []
     for k in sorted(set(a) | set(b)):
-        if k.startswith(("perm:", "appop:", "fw:")) or k.endswith(":suspended"):
+        if k.startswith(("perm:", "appop:", "fw:", "deviceidle:", "standby:")) or k.endswith(":suspended"):
             if k.split(":")[1] not in both:
                 continue
         if k.startswith("applocale:") and (k not in a or k not in b):

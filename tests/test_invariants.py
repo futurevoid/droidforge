@@ -337,7 +337,40 @@ def sc_swap(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return defaults.swap_plan(dev, "browser", disable_coloros=True, uad=UAD_SAMPLE)
 
 
+def sc_keepalive(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keepalive
+    return keepalive.keepalive_plan(dev, ["com.whatsapp", "org.telegram.messenger"])
+
+
+def sc_keepalive_remove(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keepalive
+    phone.deviceidle.add("com.whatsapp")
+    return keepalive.remove_plan(dev, ["com.whatsapp"])
+
+
+def _tasker(phone: FakePhone) -> None:
+    phone.add("net.dinglisch.android.taskerm", system=False,
+              perms={"android.permission.WRITE_SECURE_SETTINGS": False, "android.permission.READ_LOGS": False})
+
+
+def sc_powerperms(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import powerperms
+    _tasker(phone)
+    return powerperms.grant_plan(dev, {"net.dinglisch.android.taskerm": ["WRITE_SECURE_SETTINGS", "READ_LOGS",
+                                                                          "PACKAGE_USAGE_STATS"]})
+
+
+def sc_powerperms_preset(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import powerperms
+    _tasker(phone)
+    return powerperms.preset_plan(dev, ["tasker"])
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.keepalive.keepalive_plan": sc_keepalive,
+    "droidforge.features.keepalive.remove_plan": sc_keepalive_remove,
+    "droidforge.features.powerperms.grant_plan": sc_powerperms,
+    "droidforge.features.powerperms.preset_plan": sc_powerperms_preset,
     "droidforge.features.defaults.swap_plan": sc_swap,
     "droidforge.features.apps.play_plan": sc_play,
     "droidforge.features.apps.install_plan": sc_install,

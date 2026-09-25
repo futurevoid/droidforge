@@ -95,6 +95,8 @@ Rules are cleared on reboot (ShizuWall README). Re-apply on connect.
 | Install APK(s) (host) | `adb install -r <apk>` / `adb install-multiple -r <apks...>` | `pm uninstall <p>` (user app) | S |
 | Role holders | `cmd role get-role-holders --user 0 <role>` / `cmd role add-role-holder --user 0 <role> <p>` | re-add previous holder | V (syntax per RoleShellCommand; confirm with `cmd role help`) |
 | Keep-alive | `dumpsys deviceidle whitelist +<p>` (undo `-<p>`); `cmd appops set <p> RUN_ANY_IN_BACKGROUND allow` (undo previous mode); `am set-standby-bucket <p> active` (undo previous from `am get-standby-bucket <p>`) | as listed | S (AOSP); ColorOS still kills: V |
+| Keep-alive state (read) | `dumpsys deviceidle whitelist` (lines `user,<p>,<uid>` / `system,<p>,<uid>`); `am get-standby-bucket <p>` (10 active, 20 working_set, 30 frequent, 40 rare, 45 restricted) | - | S (AOSP) |
+| Open app info (ColorOS: Battery usage > allow background activity / auto launch) | `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:<p>` | - | S (AOSP); ColorOS switch names: V |
 | Power perms | `pm grant <p> android.permission.WRITE_SECURE_SETTINGS` / `READ_LOGS` / `DUMP`; `cmd appops set <p> GET_USAGE_STATS allow` | `pm revoke` / previous mode | S (AOSP); if ColorOS refuses the grant, report it - never suggest developer-option workarounds |
 
 ## Tweaks - removed (P9b)

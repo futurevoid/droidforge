@@ -90,3 +90,32 @@ def global_config(line: str) -> Dict[str, str]:
     for k, v in re.findall(r"\b(mDarkMode\w+)\s*=\s*([^,}]*)", line):
         res.setdefault(k, v.strip())
     return res
+
+
+def granted_perms(dumpsys_package: str) -> Dict[str, bool]:
+    """Install-time AND runtime permissions from `dumpsys package <p>` (power perms like WRITE_SECURE_SETTINGS
+    are listed under `install permissions:`)."""
+    out: Dict[str, bool] = {}
+    for m in re.finditer(r"^\s+([\w.]+): granted=(true|false)", dumpsys_package, re.M):
+        out.setdefault(m.group(1), m.group(2) == "true")
+    return out
+
+
+BUCKET_NAMES = {10: "active", 20: "working_set", 30: "frequent", 40: "rare", 45: "restricted"}
+
+
+def standby_bucket(out: str) -> str:
+    try:
+        return BUCKET_NAMES.get(int(out.strip()), "")
+    except ValueError:
+        return ""
+
+
+def deviceidle_whitelist(out: str) -> Dict[str, str]:
+    """{pkg: "user" | "system" | "system-excidle"} from `dumpsys deviceidle whitelist`."""
+    res: Dict[str, str] = {}
+    for line in out.splitlines():
+        parts = line.strip().split(",")
+        if len(parts) >= 2 and parts[0] in ("user", "system", "system-excidle"):
+            res.setdefault(parts[1], parts[0])
+    return res

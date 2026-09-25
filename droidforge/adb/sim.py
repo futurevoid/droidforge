@@ -36,6 +36,8 @@ ACTION_SETTINGS = "android.settings.SETTINGS"
 ACTION_PERMS = "android.intent.action.MANAGE_APP_PERMISSIONS"
 HOME = "HOME"
 
+BUCKETS = {"active": 10, "working_set": 20, "frequent": 30, "rare": 40, "restricted": 45}
+
 CONNECTIVITY_HELP = """Connectivity service commands:
   help
     Print this help text.
@@ -137,6 +139,8 @@ class FakePhone:
         self.shizuku_running = False
         self.proc_net: List[str] = []
         self.focused = "com.android.launcher"
+        self.deviceidle: Set[str] = set()             # user battery-optimisation whitelist
+        self.standby: Dict[str, int] = {}             # app standby buckets (default 30 frequent)
         self.started: List[str] = []                  # `am start` log
         self.side_effects: Dict[str, Callable[["FakePhone"], None]] = {}
         self.log: List[str] = []                      # every shell command received
@@ -232,6 +236,7 @@ class FakePhone:
                          if p.present},
             "settings": copy.deepcopy(self.settings), "props": dict(self.props), "imes": dict(self.imes),
             "roles": copy.deepcopy(self.roles), "fw": (self.firewall_chain3, sorted(self.firewall_blocked)),
+            "keepalive": (sorted(self.deviceidle), sorted((k, v) for k, v in self.standby.items() if v != 30)),
             "config": self.config.line(), "resolve": dict(self.resolve),
         }
 
@@ -794,8 +799,19 @@ class SimBackend:
             if p:
                 p.running = False
             return _ok()
+        if verb in ("get-standby-bucket", "set-standby-bucket"):
+            p = self._pkg(t[2])
+            if p is None:
+                return _fail(f"Unknown package: {t[2]}", 255)
+            if verb.startswith("get"):
+                return _ok(str(self.phone.standby.get(p.name, 30)))
+            self.phone.standby[p.name] = BUCKETS[t[3]]
+            return _ok()
         if verb == "start":
             a = t[2:]
+            if a[:2] == ["-a", "android.settings.APPLICATION_DETAILS_SETTINGS"] and "-d" in a:
+                self.phone.started.append(f"app-info {a[a.index('-d') + 1]}")
+                return _ok("Starting: Intent { act=android.settings.APPLICATION_DETAILS_SETTINGS }")
             if "-n" in a:
                 comp = a[a.index("-n") + 1]
                 if not self.phone.pkg_ok(comp.split("/")[0]):
@@ -828,6 +844,20 @@ class SimBackend:
             return _ok("WINDOW MANAGER POLICY STATE (dumpsys window policy)\n"
                        f"  mCurrentFocus=Window{{8e1f2a u0 {act}}}\n"
                        f"  mFocusedApp=ActivityRecord{{3b7c19 u0 {act} t42}}\n  mInTouchMode=true")
+        if what == "deviceidle" and t[2:3] == ["whitelist"]:
+            if len(t) == 3:
+                return _ok("\n".join([f"system,{p},{self.phone.packages[p].uid}" for p in ("com.google.android.gms",)
+                                      if p in self.phone.packages] +
+                                     [f"user,{p},{self.phone.packages[p].uid}" for p in sorted(self.phone.deviceidle)]))
+            arg = t[3]
+            pkg = arg[1:]
+            if self._pkg(pkg) is None:
+                return _fail(f"Package not found: {pkg}", 255)
+            if arg.startswith("+"):
+                self.phone.deviceidle.add(pkg)
+                return _ok(f"Added: {pkg}")
+            self.phone.deviceidle.discard(pkg)
+            return _ok(f"Removed: {pkg}")
         if what == "package" and len(t) == 3:
             return self._dumpsys_package(t[2])
         raise Unsupported(" ".join(t))
