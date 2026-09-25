@@ -58,7 +58,7 @@ the health gate is not done.
 - [x] **P1.7** `engine/safety.py` verdicts (locked/guarded/expert/keep/unknown/ok), typed requirements, R-4.3b UI
   infrastructure hidden+locked. Accept: locked package without typed name is rejected by the executor; overlays
   are absent from default package lists.
-- [ ] **P1.8** `tests/test_invariants.py`: for every registered plan builder on the sim - every write step passes
+- [x] **P1.8** `tests/test_invariants.py`: for every registered plan builder on the sim - every write step passes
   the guard, declares `touches`, has undo; execute -> diff shows only declared keys -> undo -> snapshot equals
   the original. Grows with each phase; a builder that is not registered fails the suite.
 - [ ] **P1.9** `features/doctor.py` (R-2.8): read-only report incl. health probes; on failure recommends Settings >
