@@ -415,7 +415,15 @@ def sc_connect(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return wireless.connect_plan("192.168.1.20:40001")
 
 
+def sc_audit_revoke(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features.audit import perms
+    phone.packages["com.whatsapp"].appops["SYSTEM_ALERT_WINDOW"] = "allow"
+    return perms.revoke_plan(dev, [("com.whatsapp", "android.permission.CAMERA"),
+                                   ("com.whatsapp", "SYSTEM_ALERT_WINDOW")])
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.audit.perms.revoke_plan": sc_audit_revoke,
     "droidforge.features.wireless.pair_plan": sc_pair,
     "droidforge.features.wireless.connect_plan": sc_connect,
     "droidforge.features.tools.activities.curated_plan": sc_curated,

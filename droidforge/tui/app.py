@@ -31,6 +31,7 @@ from droidforge.features.doctor import DoctorReport
 from droidforge.tui.screens.breakage import BreakageAlert
 from droidforge.tui.screens.base import Section
 from droidforge.tui.screens.apps import AppsSection
+from droidforge.tui.screens.audit import AuditSection
 from droidforge.tui.screens.dashboard import DashboardSection
 from droidforge.tui.screens.firewall import FirewallSection
 from droidforge.tui.screens.keepalive import KeepAliveSection
@@ -68,13 +69,14 @@ SECTIONS: List[Tuple[str, str]] = [
     ("apps", "Apps & defaults"),
     ("keepalive", "Keep-alive & perms"),
     ("tools", "Tools"),
+    ("audit", "Audit"),
     ("history", "Backup & History"),
 ]
 
 
 SECTION_CLASSES = {"dashboard": DashboardSection, "language": LanguageSection, "keyboard": KeyboardSection,
                    "debloat": DebloatSection, "privacy": PrivacySection, "firewall": FirewallSection,
-                   "apps": AppsSection, "keepalive": KeepAliveSection, "tools": ToolsSection,
+                   "apps": AppsSection, "keepalive": KeepAliveSection, "tools": ToolsSection, "audit": AuditSection,
                    "history": HistorySection}
 
 

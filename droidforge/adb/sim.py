@@ -893,6 +893,10 @@ class SimBackend:
                 return _ok(f"Added: {pkg}")
             self.phone.deviceidle.discard(pkg)
             return _ok(f"Removed: {pkg}")
+        if what == "package" and t[2:] == ["packages"]:
+            blocks = [self._dumpsys_package(n).out.split("\n", 1)[1] for n in sorted(self.phone.packages)
+                      if self._pkg(n) is not None]
+            return _ok("Packages:\n" + "\n".join(blocks))
         if what == "package" and len(t) == 3:
             return self._dumpsys_package(t[2])
         raise Unsupported(" ".join(t))
