@@ -26,7 +26,9 @@ def test_ota_shows_what_was_undone_and_asks(sim, phone: FakePhone) -> None:
     assert [s.cmd for s in rep.plan.steps] == [f"pm disable-user --user 0 {TELEMETRY[1]}"]
     assert rep.reverted and TELEMETRY[1] in rep.reverted[0]
     assert executor.run(rep.plan, sim, yes, profile=prof).status == "done"
-    assert not ota.check(sim, prof).changed                     # executor stored the new fingerprint
+    assert ota.check(sim, prof).changed                         # a plan never swallows the OTA prompt
+    ota.acknowledge(prof, sim)
+    assert not ota.check(sim, prof).changed
 
 
 def test_acknowledge_without_reapply(sim, phone: FakePhone) -> None:

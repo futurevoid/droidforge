@@ -40,7 +40,7 @@ class LanguageSection(Section):
         yield Static("", id="caught", markup=False)
         yield Label("Per-app language - your own apps only (system apps follow the device language)",
                     classes="subtitle")
-        yield SelectionList[str](id="apps")
+        yield SelectionList[str](id="lang-apps")
         with Horizontal(classes="buttons"):
             yield Input(value=language.DEFAULT_APP_LOCALES, id="locales", placeholder="en-US,ar-EG")
             yield Button("Set language for picked apps", id="set-apps")
@@ -57,7 +57,7 @@ class LanguageSection(Section):
         if st.chinese_first:
             msg += "\nChinese is first: open Settings > Language, add English and drag it to the top."
         self.query_one("#lang-status", Static).update(msg)
-        sl = self.query_one("#apps", SelectionList)
+        sl = self.query_one("#lang-apps", SelectionList)
         picked = set(sl.selected)
         sl.clear_options()
         sl.add_options([(p, p, p in picked) for p in cands])
@@ -74,7 +74,7 @@ class LanguageSection(Section):
         elif bid == "open-app-lang":
             app.run_plan(lambda: language.open_app_languages(dev))
         elif bid == "set-apps":
-            picked = list(self.query_one("#apps", SelectionList).selected)
+            picked = list(self.query_one("#lang-apps", SelectionList).selected)
             locs = self.query_one("#locales", Input).value.strip()
             app.run_plan(lambda: language.app_language_plan(dev, picked, locs))
         elif bid == "guide-1":

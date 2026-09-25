@@ -257,7 +257,7 @@ async def test_every_section_runs_one_action(df_home: Path) -> None:
         press(app, "#open-lang")
         await run_previewed(app, pilot)
         assert "android.settings.LOCALE_SETTINGS" in phone.started
-        app.query_one("#apps").select("com.whatsapp")
+        app.query_one("#lang-apps").select("com.whatsapp")
         app.query_one("#locales").value = "en-US,ar-EG"
         press(app, "#set-apps")
         await run_previewed(app, pilot)
@@ -515,3 +515,61 @@ async def test_unexplained_break_offers_only_manual_path(df_home: Path) -> None:
         assert "Unresolved alerts" in str(app2.query_one("#alerts").render())
     writes = [c for c in phone.log[n:] if c.startswith(WRITE_PREFIXES)]
     assert writes == []
+
+
+# ---------------------------------------------------------------- P4.10 Phase 4 sections
+async def test_phase4_sections_run_one_action_each(df_home: Path) -> None:
+    write_uad_cache(df_home)
+    phone = neo8_cn()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        app.show_section("privacy")
+        await settle(app, pilot)
+        press(app, "#dns")
+        await run_previewed(app, pilot)
+        assert phone.settings["global"]["private_dns_specifier"] == "dns.adguard-dns.com"
+
+        app.show_section("firewall")
+        await settle(app, pilot)
+        app.query_one("#fw-apps").select("com.whatsapp")
+        press(app, "#fw-block")
+        await run_previewed(app, pilot)
+        assert "com.whatsapp" in phone.firewall_blocked
+
+        app.show_section("apps")
+        await settle(app, pilot)
+        press(app, "#swap")
+        await run_previewed(app, pilot)
+        assert phone.roles["android.app.role.BROWSER"] == ["org.mozilla.fenix"]
+
+        app.show_section("keepalive")
+        await settle(app, pilot)
+        app.query_one("#ka-apps").select("org.telegram.messenger")
+        press(app, "#ka-on")
+        await run_previewed(app, pilot)
+        assert "org.telegram.messenger" in phone.deviceidle
+        press(app, "#datetime")
+        await run_previewed(app, pilot)
+        assert phone.started[-1] == "android.settings.DATE_SETTINGS"
+
+
+async def test_ota_prompt_on_connect(df_home: Path) -> None:
+    from droidforge.engine.profile import Profile
+    from droidforge.tui.screens.modals import ConfirmBox
+    phone = neo8_cn()
+    prof = Profile.for_device(phone.serial)
+    prof.fingerprint = "realme/RMX8899/old:16/OLD/1:user/release-keys"
+    prof.disabled = ["com.heytap.mcs"]
+    prof.save()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        for _ in range(80):
+            await pilot.pause(0.05)
+            if isinstance(app.screen, ConfirmBox) and app.screen.query("#yes"):
+                break
+        assert "System update" in str(app.screen.query_one("Label").render())
+        app.screen.query_one("#yes").press()
+        await run_previewed(app, pilot)
+        assert not phone.packages["com.heytap.mcs"].enabled
+        assert any("notify-send" in c for c in phone.host_log)

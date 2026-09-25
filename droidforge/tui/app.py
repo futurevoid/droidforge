@@ -30,7 +30,11 @@ from droidforge.features import fix
 from droidforge.features.doctor import DoctorReport
 from droidforge.tui.screens.breakage import BreakageAlert
 from droidforge.tui.screens.base import Section
+from droidforge.tui.screens.apps import AppsSection
 from droidforge.tui.screens.dashboard import DashboardSection
+from droidforge.tui.screens.firewall import FirewallSection
+from droidforge.tui.screens.keepalive import KeepAliveSection
+from droidforge.tui.screens.privacy import PrivacySection
 from droidforge.tui.screens.debloat import DebloatSection
 from droidforge.tui.screens.history import HistorySection
 from droidforge.tui.screens.keyboard import KeyboardSection
@@ -42,18 +46,33 @@ from droidforge.tui.widgets.log_pane import LogPane
 from droidforge.tui.widgets.plan_preview import PlanPreview
 
 PlanDone = Callable[[RunReport], None]
+LONG_JOB_S = 30.0
+
+
+def notify(app: "DroidforgeApp", title: str, body: str) -> None:
+    """Desktop notification (R-2.7) - never fatal."""
+    from droidforge import notify as nt
+    try:
+        nt.notify(title, body, app.session.device if app.session else None)
+    except Exception as e:  # a notification must never break the app
+        LOG.dbg(f"notify failed: {e}")
 
 SECTIONS: List[Tuple[str, str]] = [
     ("dashboard", "Dashboard"),
     ("language", "Language"),
     ("keyboard", "Keyboard"),
     ("debloat", "Debloat"),
+    ("privacy", "Privacy & ads"),
+    ("firewall", "Firewall"),
+    ("apps", "Apps & defaults"),
+    ("keepalive", "Keep-alive & perms"),
     ("history", "Backup & History"),
 ]
 
 
 SECTION_CLASSES = {"dashboard": DashboardSection, "language": LanguageSection, "keyboard": KeyboardSection,
-                   "debloat": DebloatSection, "history": HistorySection}
+                   "debloat": DebloatSection, "privacy": PrivacySection, "firewall": FirewallSection,
+                   "apps": AppsSection, "keepalive": KeepAliveSection, "history": HistorySection}
 
 
 class DroidforgeApp(App[None]):
@@ -86,6 +105,9 @@ class DroidforgeApp(App[None]):
         self.sleep: Callable[[float], None] = time.sleep   # tests replace it (reboot check polling)
         self._pending: List[Tuple[threading.Event, Dict[str, Confirmation]]] = []
         self.ignored: List[fix.Breakage] = []
+        self._plan_started = 0.0
+        # one engine call at a time: plans, checks and reads share one Device (caches, snapshots, adb)
+        self._dev_lock = threading.RLock()
 
     # ------------------------------------------------------------------ layout
     def compose(self) -> ComposeResult:
@@ -180,7 +202,8 @@ class DroidforgeApp(App[None]):
             ready = [r for r in rows if r[1] == "device"]
             self.call_from_thread(self._connect_failed, str(e), rows if len(ready) > 1 else [])
             return
-        s.start()  # session-start backup (R-11.3)
+        with self._dev_lock:
+            s.start()  # session-start backup (R-11.3)
         label = s.device.label
         self.call_from_thread(self._connected, s, label)
 
@@ -200,6 +223,7 @@ class DroidforgeApp(App[None]):
         self.sections[current].refresh_from(self)
         self.check_startup()  # R-12.5: breakage between sessions is caught at every connect
         self.check_firewall()  # R-5.5 / P14: rules cleared by a reboot -> ask, never re-apply on our own
+        self.check_ota()       # R-2.5 / P14: system update detected -> show what it undid, ask
 
     def refresh_bar(self, **fields: str) -> None:
         s = self.session
@@ -223,23 +247,25 @@ class DroidforgeApp(App[None]):
 
     @work(thread=True, exclusive=True, group="plan")
     def _plan_worker(self, plan: Union[Plan, Callable[[], Plan]], on_done: Optional[PlanDone]) -> None:
+        self._plan_started = time.monotonic()
         s = self.session
         assert s is not None
-        try:
-            built = plan() if callable(plan) else plan
-        except Exception as e:  # a builder that cannot read what it needs: show it, never crash the app
-            LOG.error(f"could not build the plan: {e}")
-            self.call_from_thread(self.message, "Could not build the plan", str(e))
-            return
-        if not built.steps:
-            self.call_from_thread(self.message, built.title, "\n".join(built.notes) or "Nothing to do.")
-            return
-        try:
-            rep = executor.run(built, s.device, self.confirm_blocking, dry_run=self.dry_run, history=s.history,
-                               profile=s.profile, expert_mode=self.expert)
-        except Exception as e:
-            self.call_from_thread(self._crashed, built, e)
-            return
+        with self._dev_lock:
+            try:
+                built = plan() if callable(plan) else plan
+            except Exception as e:  # a builder that cannot read what it needs: show it, never crash the app
+                LOG.error(f"could not build the plan: {e}")
+                self.call_from_thread(self.message, "Could not build the plan", str(e))
+                return
+            if not built.steps:
+                self.call_from_thread(self.message, built.title, "\n".join(built.notes) or "Nothing to do.")
+                return
+            try:
+                rep = executor.run(built, s.device, self.confirm_blocking, dry_run=self.dry_run, history=s.history,
+                                   profile=s.profile, expert_mode=self.expert)
+            except Exception as e:
+                self.call_from_thread(self._crashed, built, e)
+                return
         self.call_from_thread(self._plan_finished, rep, on_done)
 
     def _crashed(self, plan: Plan, e: Exception) -> None:
@@ -263,7 +289,8 @@ class DroidforgeApp(App[None]):
     @work(thread=True, group="read")
     def _bg_worker(self, fn: Callable[[], Any], done: Callable[[Any], None]) -> None:
         try:
-            res = fn()
+            with self._dev_lock:
+                res = fn()
         except Exception as e:
             LOG.error(f"read failed: {e}")
             return
@@ -301,6 +328,8 @@ class DroidforgeApp(App[None]):
 
     def _plan_finished(self, rep: RunReport, on_done: Optional[PlanDone]) -> None:
         self.last_report = rep
+        if time.monotonic() - self._plan_started > LONG_JOB_S:
+            notify(self, "droidforge: plan finished", f"{rep.plan.title}: {rep.status}")
         self.refresh_bar()
         if rep.status == "refused":
             self.push_screen(MessageBox("Refused", rep.error))
@@ -355,6 +384,31 @@ class DroidforgeApp(App[None]):
         still = fix.Breakage(b.source, regs, [], b.recent, None, "Still not right after Fix it")
         self.show_breakage(still)
 
+    def check_ota(self) -> None:
+        s = self.session
+        if s is None:
+            return
+        from droidforge.features import ota
+
+        def ask(rep: "ota.OtaReport") -> None:
+            if not rep.changed:
+                if s.profile.fingerprint != rep.new:
+                    s.profile.note_device(s.device)     # first connect: remember the build
+                    if s.profile.path:
+                        s.profile.save()
+                return
+            notify(self, "droidforge: system update detected", "Your saved changes can be re-applied.")
+            if rep.plan is None or not rep.plan.steps:
+                ota.acknowledge(s.profile, s.device)
+                return
+            body = ("The phone got a system update. It undid:\n" + "\n".join(f"  {r}" for r in rep.reverted)
+                    + "\n\nRe-apply your changes? You will see the plan first.")
+            self.push_screen(ConfirmBox("System update detected", body, "Re-apply", "Keep as it is"),
+                             lambda yes: self.run_plan(rep.plan, on_done=lambda r: ota.acknowledge(
+                                 s.profile, s.device) if r.status == "done" else None)
+                             if yes else ota.acknowledge(s.profile, s.device))
+        self.background(lambda: ota.check(s.device, s.profile, None, self.expert), ask)
+
     def check_firewall(self) -> None:
         s = self.session
         if s is None or not s.profile.firewall:
@@ -397,8 +451,9 @@ class DroidforgeApp(App[None]):
         s = self.session
         assert s is not None
         try:
-            rep = reboot_check(s.device, before, self.confirm_blocking, sleep=self.sleep, dry_run=self.dry_run,
-                               history=s.history, profile=s.profile, expert_mode=self.expert)
+            with self._dev_lock:
+                rep = reboot_check(s.device, before, self.confirm_blocking, sleep=self.sleep, dry_run=self.dry_run,
+                                   history=s.history, profile=s.profile, expert_mode=self.expert)
         except Exception as e:
             self.call_from_thread(self._crashed, before.plan, e)
             return

@@ -43,7 +43,7 @@ def check(device: "Device", profile: "Profile", uad: Optional[Mapping[str, dict]
 
 
 def acknowledge(profile: "Profile", device: "Device") -> None:
-    """The user chose not to re-apply: remember the new build so the prompt does not repeat."""
-    profile.note_device(device)
+    """The update was dealt with (re-applied, or the user keeps it as it is): remember the new build."""
+    profile.set_build(device)
     if profile.path:
         profile.save()

@@ -99,7 +99,13 @@ class Profile:
 
     # ------------------------------------------------------------------ bookkeeping
     def note_device(self, device: "Device") -> None:
+        """Model always; the build fingerprint only on first contact - after that it changes only when the user
+        has dealt with a system update (set_build), so no plan or check can swallow the OTA prompt (R-2.5)."""
         self.model = device.label
+        if not self.fingerprint:
+            self.fingerprint = device.fingerprint
+
+    def set_build(self, device: "Device") -> None:
         self.fingerprint = device.fingerprint
 
     def save_healthy(self, report: Any, mark_time: bool = True) -> None:
