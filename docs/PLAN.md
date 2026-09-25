@@ -49,7 +49,7 @@ the health gate is not done.
   (c) a sim `side_effects` rule that flips an undeclared setting is caught and the plan stops after that batch;
   (d) `break_ui()` triggered by step 3 of 12 stops the plan before batch 2; (e) the recovery script exists before
   the first command is sent and restores the sim when replayed.
-- [ ] **P1.5** (R-11.2) `engine/history.py` JSONL timeline, `undo(ids)`, `rollback_to(id)` -> Plans (through the
+- [x] **P1.5** (R-11.2) `engine/history.py` JSONL timeline, `undo(ids)`, `rollback_to(id)` -> Plans (through the
   same executor, so undo is guarded and health-gated too). Accept: disable 3 packages, rollback to the first ->
   sim state equals initial; undone flags set.
 - [ ] **P1.6** (R-2.4) `engine/profile.py` per-device desired state, export/import (import = previewed plan, P14),

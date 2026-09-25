@@ -24,6 +24,7 @@ class Step:
     fallbacks: List["Step"] = field(default_factory=list)   # escalation chain (force-disable)
     host: bool = False               # run on the PC instead of the phone
     touches: List[str] = field(default_factory=list)       # declared blast radius (P10)
+    undoes: Optional[str] = None     # history entry id this step reverts (history marks it undone)
 
     def all_undo(self) -> List[str]:
         """Undo of this step and every fallback stage, in the order they would be applied."""
