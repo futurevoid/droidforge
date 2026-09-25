@@ -69,7 +69,7 @@ def run(device: "Device", profile: Optional["Profile"] = None, history: Optional
     rows.append(("ROM family", f"ColorOS family {device.getprop('ro.build.version.oplusrom')}" if rom == "coloros"
                  else "generic Android (AOSP commands only)"))
     root = device.read("su -c id")
-    rows.append(("Root", "yes (flavor detection: Phase 7)" if root.ok and "uid=0" in root.out else "no"))
+    rows.append(("Root", "yes (root mode comes in v2)" if root.ok and "uid=0" in root.out else "no"))
     shizuku = device.read(f"pm path {SHIZUKU}")
     rows.append(("Shizuku", "installed" if shizuku.ok and shizuku.out.strip() else "not installed"))
     rows.append(("Device language", device.out("getprop persist.sys.locale")

@@ -327,4 +327,5 @@ are withdrawn by the owner (2026-09-25).
 | Time settings | none written; screens only opened |
 | Reboot check | offered after risky plans |
 | Legacy cnrom_fix.py | stripped of language/config features now; retired when droidforge v1 ships |
+| v1 scope (2026-09-25, later) | v1 is published with Phases 0-6 and 8; root mode (Phase 7) moves to v2; the real-device validation (Phase 9) is deferred and runs after v1. The V-status commands stay marked V until then |
 | Incident 2026-09-25 | ColorOS "Disable permission monitoring" switch (turned on on Claude's advice) broke Settings; Reset all settings turned it off. Owner confirmed. Owner order: never break anything, never change what doesn't need changing -> P0, P7-P16, R-11.7 #6. Initially blamed on the legacy language setter (kept forbidden as defence in depth). Owner: droidforge must not change anything it does not need to and must not be able to cause this again -> P7-P12, R-3 rewrite, R-11.7/11.8 |

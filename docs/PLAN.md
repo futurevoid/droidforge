@@ -128,6 +128,10 @@ the health gate is not done.
 
 - [ ] **P5.1** `features/wireless.py` QR pairing (TUI QR widget from `qrcode` matrix, half-block rendering),
   mDNS polling, pair + connect, code fallback, remembered devices (R-2.2).
+  - Open question (owner): pairing only works with Developer options > Wireless debugging on, but P0 says
+    droidforge never tells the user to enable any developer-option switch (the same applies to USB debugging in
+    the "no device" message). (a) allow naming USB / Wireless debugging only, or (b) never name any developer
+    option? Built with neutral wording until answered; task stays open.
 - [ ] **P5.2** `features/shizuku.py` install from GitHub release + auto-start on connect + status (R-2.3).
 - [ ] **P5.3** `tools/scrcpy.py` (R-9.1) with pacman hint. **P5.4** `tools/logcat.py` streaming pane (R-9.2).
 - [ ] **P5.5** `tools/activities.py` curated intents + exported-activity browser (R-9.3).
@@ -138,7 +142,7 @@ the health gate is not done.
 - [ ] **P6.1** `audit/perms.py` + table with revoke (R-8.1). **P6.2** `audit/signers.py` (R-8.2).
 - [ ] **P6.3** `audit/net.py` live connections (R-8.3). **P6.4** audit JSON output in CLI.
 
-## Phase 7 - Root mode
+## Phase 7 - Root mode (moved to v2 by owner decision, 2026-09-25)
 
 - [ ] **P7.1** `root/detect.py` flavor/version; `root/modules.py` build zip (module.prop, scripts), push, install,
   list/remove (R-10.1). Sim gets a `root` flavor option.
@@ -154,6 +158,7 @@ the health gate is not done.
 - [ ] **P8.3** `features/update.py` self-update (R-12.4).
 - [ ] **P8.4** README (install via pipx / AUR, first run, safety model, screenshots from sim), CHANGELOG,
   PKGBUILD finalised, tag v1.0.0 only after Phase 9 passes.
+  - Owner decision (2026-09-25): publish v1.0.0 after Phases 5, 6 and 8; Phase 7 is v2; Phase 9 runs after v1.
 
 ## Phase 9 - Real-device validation (owner runs; Claude Code prepares)
 
