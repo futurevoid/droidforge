@@ -36,8 +36,9 @@ the health gate is not done.
   `cmd overlay`, `pm clear` on system apps); a made-up command is refused.
 - [ ] **P1.2** (P10, R-11.8) `engine/snapshot.py`: take/diff of settings, package states, app locales, IME,
   launcher, global-config fields. Accept: diff on sim finds exactly the injected changes, nothing else.
-- [ ] **P1.3** (P11, R-11.7) `engine/health.py`: probes + baseline compare. Accept: `break_ui()` on the sim is
-  reported as 2+ regressions; a healthy sim reports none.
+- [ ] **P1.3** (P0, P11, R-11.7) `engine/health.py`: probes + baseline compare. Accept: `break_ui()` on the sim is
+  reported as 2+ regressions; a healthy sim reports none; sim `permission_monitoring=True` is reported with the
+  "turn it off" message even when the baseline already had it on.
 - [ ] **P1.4** (R-11.1, R-11.5, P1, P5, P13, P15) `engine/plan.py` (`Step.touches`) + `engine/executor.py`: guard
   -> confirm -> baseline health+snapshot -> recovery script -> batches of <=5 with diff+health after each ->
   stop on first regression -> undo offer. Accept: (a) dry-run touches nothing; (b) fallback escalation works;
@@ -153,6 +154,9 @@ Claude Code writes `docs/DEVICE_CHECKLIST.md`: for every **V** command in COMMAN
 then the smallest reversible write, the expected output, and the undo. The owner runs it on the Neo 8
 (non-root) and realme 10 (root), pastes outputs back, and Claude Code updates statuses, fixes parsers,
 and adds `tests/data/neo8_cn_packages.txt` (from `pm list packages -f -u`) to re-seed the simulator.
+- Permission-monitoring key (health probe R-11.7 #6): droidforge saves `settings list system/secure/global` +
+  `getprop`; the owner turns the switch ON, droidforge saves again and diffs, the owner turns it OFF and reboots,
+  droidforge confirms the key flipped back. droidforge itself only reads. Record the key in COMMANDS.md.
 - Before any write in the checklist: `droidforge doctor` saves the healthy baseline (health probes + settings
   snapshot) so every later step is compared against the phone as it is now (after "Reset all settings").
 - [ ] **P9.1** Checklist written. - [ ] **P9.2** Neo 8 results applied. - [ ] **P9.3** realme 10 results applied.

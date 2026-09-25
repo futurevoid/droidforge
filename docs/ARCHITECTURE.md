@@ -155,7 +155,9 @@ signer, app_locales, activities[]}}`, `settings{system,secure,global}`, `props`,
 firewall chain state, global configuration `{locales, font_scale, density, night, oem{mMaterialColor,
 mUxIconConfig, mFontVariationSettings, mDarkMode*}}` rendered as an `mGlobalConfig=` line like the owner's real
 dump, resolve-activity results for Settings / permissions, crash buffer, root flavor (`None|magisk|ksu|apatch`),
-Shizuku installed/running, `protected` packages (disable refused), `/proc/net` lines.
+Shizuku installed/running, `protected` packages (disable refused), `/proc/net` lines, and a
+`permission_monitoring` flag exposed through a placeholder setting until Phase 9 records the real key
+(`break_ui()` also turns it on, as in the real incident).
 Fault injection for tests: `side_effects={cmd_regex: mutation}` (a command also changes an undeclared key),
 `break_ui()` (Settings resolves to an AOSP activity, `mMaterialColor` -> 0).
 `SimBackend.run()` parses the subset of commands listed in `docs/COMMANDS.md` (including the `for p in ...` batch
@@ -179,4 +181,5 @@ Long-running streams (logcat, live connections) are cancellable workers.
 UAD handling, verdicts/preflight, force-disable escalation, neuter, IME handling. Port the behaviour; do not copy
 the structure. **Do not port** its language features - menu `e` "Force English everywhere", the device-locale
 DEX (`locale_tool`, `set_device_locale`), `set_system_locales`, the all-packages `force_english`, MoreLocale, and
-the menu 7 "repair" option. They caused the 2026-09-25 incident and are Forbidden in COMMANDS.md.
+the menu 7 "repair" option, and any message telling the user to enable "Disable permission monitoring" (the
+actual cause of the 2026-09-25 incident). All are Forbidden in COMMANDS.md.

@@ -5,8 +5,8 @@ over adb (no root), with a root mode for Magisk / KernelSU / APatch. Owner: futu
 
 ## Read first, every session
 
-0. `docs/INCIDENT-2026-09-25.md` - the legacy tool broke the owner's ColorOS Settings. This is why the rules
-   below exist. The owner's standing order: **droidforge must never break anything and must not change anything
+0. `docs/INCIDENT-2026-09-25.md` - the owner's ColorOS Settings broke because the developer switch "Disable
+   permission monitoring" was turned on (Claude had advised it). This is why the rules below exist. The owner's standing order: **droidforge must never break anything and must not change anything
    that does not need to change.**
 1. `docs/SPEC.md` - requirements (R-ids) and the owner's decision log. Do not re-decide what is decided there.
 2. `docs/ARCHITECTURE.md` - layers, package layout, core types.
@@ -42,6 +42,8 @@ over adb (no root), with a root mode for Magisk / KernelSU / APatch. Owner: futu
   display/UI setting (P9, P9b), never target system packages with per-app locales (P12), never add a bulk pass
   over all packages, never add a "repair" that toggles settings. If a task seems to need one of these, stop and
   ask the owner.
+- **Never** suggest, require or write the "Disable permission monitoring" / "Disable system optimization"
+  developer switch (or any developer option). If ColorOS refuses something without it, the feature is dropped.
 - Critical packages need expert mode (`--expert`, typed name, one per batch, health gate, reboot check). Do not
   add shortcuts around it.
 - Out of scope: IMEI/serial changes, leaked keyboxes, targeting devices the operator does not own.
@@ -78,4 +80,5 @@ droidforge --simulate doctor     # CLI against the fake phone
 ## No device-side binaries
 
 droidforge ships nothing that runs on the phone in non-root mode. The legacy locale-setter DEX and its smali source
-were deleted from this repo on purpose (INCIDENT-2026-09-25). Do not recreate them or anything like them.
+were deleted from this repo on purpose: they only worked with the permission-monitoring switch on
+(INCIDENT-2026-09-25). Do not recreate them or anything like them.

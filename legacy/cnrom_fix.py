@@ -16,8 +16,10 @@ Quick start  : menu 'e' = guided English setup: YOU set the language in Settings
 
 RETIRED (2026-09-25): replaced by droidforge. This version is kept only because it is safe:
   - removed: the built-in device-language setter (DEX/app_process), writes to system_locales, MoreLocale,
-    "Force English everywhere", per-app language on system apps, the "repair" option. The device-language
-    setter broke the ColorOS Settings UI on a realme Neo 8 until Settings > Reset all settings.
+    "Force English everywhere", per-app language on system apps, the "repair" option.
+  - NEVER turn on Developer options > "Disable permission monitoring" / "Disable system optimization": it broke
+    the ColorOS Settings and permission screens on a realme Neo 8 until Settings > Reset all settings
+    (which turns it off). Nothing in this script needs it.
   - per-app language: your own apps only, max 5 at a time.
   - health check: before/after every menu action it compares Settings/permission screens and the display
     configuration; if anything changed it tells you and offers to undo.

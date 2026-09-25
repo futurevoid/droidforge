@@ -37,7 +37,13 @@ devices the operator does not own.
 
 ### Safety principles added after the 2026-09-25 incident
 
-See `docs/INCIDENT-2026-09-25.md`. These override anything below that conflicts with them.
+See `docs/INCIDENT-2026-09-25.md` (root cause: the ColorOS developer switch "Disable permission monitoring",
+turned on on Claude's advice). These override anything below that conflicts with them.
+
+- **P0 Never the permission-monitoring switch.** droidforge never tells the user to enable "Disable permission
+  monitoring" / "Disable system optimization" (禁止权限监控) or any other developer-option switch, never writes
+  the setting behind it, and has no feature that depends on it. A command ColorOS refuses without that switch
+  is reported as unsupported and the feature is dropped. The switch's state is a health probe (R-11.7 #6).
 
 - **P7 Minimal footprint.** A feature touches only the exact package, setting or app-op the user chose.
   No side changes, no "repair" toggles, no bulk passes over every installed package.
@@ -90,8 +96,10 @@ See `docs/INCIDENT-2026-09-25.md`. These override anything below that conflicts 
 - **R-2.7** Desktop notifications through `notify-send` (if present): long job finished, device disconnected,
   OTA detected.
 - **R-2.8** `doctor` (read-only): SDK, ROM family, root flavor, Shizuku state, `cmd locale` support,
-  firewall-chain support, the R-11.7 health probes, and droidforge's history on this device. If a probe fails
-  it recommends **Settings > Reset all settings** (keeps apps and data); it never tries to repair configuration.
+  firewall-chain support, the R-11.7 health probes, and droidforge's history on this device. Recovery advice in
+  order: (1) if the permission-monitoring switch is on, turn it off and reboot; (2) undo droidforge's recent
+  plans; (3) **Settings > Reset all settings** (keeps apps and data - it also resets developer options). It never
+  tries to repair configuration itself.
 
 ## 3. Language & input (rewritten after the incident: P9, P12)
 
@@ -232,6 +240,11 @@ are withdrawn by the owner (2026-09-25).
   4. `font_scale`, `ui_night_mode` / `cmd uimode night`, default IME and default launcher as at baseline unless
      declared.
   5. SystemUI and Settings processes alive; crash buffer (`logcat -b crash`) has no new entries for them.
+  6. **"Disable permission monitoring" is off.** Read-only check of the setting behind the switch (key found in
+     Phase 9, COMMANDS.md "Health probes"). If it is on - even if droidforge did not turn it on - the breakage
+     alert says: "ColorOS developer switch 'Disable permission monitoring' is ON. It breaks the Settings and
+     permission screens. Turn it off: Developer options > bottom of the list, then reboot." droidforge does not
+     flip it itself; it opens Developer options for the user.
 - **R-11.9** Reboot check: after risky plans (debloat of any system app, keyboard/default-app changes, expert
   actions, every root action) droidforge offers "reboot now and re-check"; after boot it waits for
   `sys.boot_completed=1`, re-runs the health probes and snapshot against the pre-plan baseline, and offers undo on
@@ -314,4 +327,4 @@ are withdrawn by the owner (2026-09-25).
 | Time settings | none written; screens only opened |
 | Reboot check | offered after risky plans |
 | Legacy cnrom_fix.py | stripped of language/config features now; retired when droidforge v1 ships |
-| Incident 2026-09-25 | legacy language setter broke ColorOS Settings; fixed by Reset all settings. Owner: droidforge must not change anything it does not need to and must not be able to cause this again -> P7-P12, R-3 rewrite, R-11.7/11.8 |
+| Incident 2026-09-25 | ColorOS "Disable permission monitoring" switch (turned on on Claude's advice) broke Settings; Reset all settings turned it off. Owner confirmed. Owner order: never break anything, never change what doesn't need changing -> P0, P7-P16, R-11.7 #6. Initially blamed on the legacy language setter (kept forbidden as defence in depth). Owner: droidforge must not change anything it does not need to and must not be able to cause this again -> P7-P12, R-3 rewrite, R-11.7/11.8 |

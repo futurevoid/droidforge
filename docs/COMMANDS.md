@@ -160,6 +160,8 @@ Nothing here. All display/UI commands moved to "Forbidden".
 | IME / launcher | `settings get secure default_input_method`, `cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME` | L |
 | Crashes | `logcat -b crash -d -t 200` | L |
 | Process alive | `pidof com.android.systemui`, `pidof com.android.settings` | L |
+| Permission-monitoring switch off | read the setting/prop behind Developer options > "Disable permission monitoring" (key unknown yet: found in Phase 9 by the owner flipping it while droidforge diffs `settings list system/secure/global` + `getprop`; droidforge only reads) | V |
+| Open Developer options (for the user to turn the switch off) | `am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS` | S |
 
 ## Forbidden (P9) - never implement, never add to the allowlist
 
@@ -173,7 +175,7 @@ Nothing here. All display/UI commands moved to "Forbidden".
 | `cmd uimode night <mode>` as a "repair" | Repair toggles are side changes (P7); night mode is the user's setting |
 | `pm clear <system package>` | Wipes system app state; not needed by any feature |
 | Blanket `settings put` restores from a dump | Writes hundreds of keys; use Settings > Reset all settings instead |
-| Instructing the user to enable "Disable permission monitoring" / "Disable system optimization" | Only needed by the forbidden paths above; not a droidforge requirement |
+| **Instructing the user to enable "Disable permission monitoring" / "Disable system optimization" / any developer-option switch; writing the setting or prop behind it** | **Root cause of the 2026-09-25 incident (owner confirmed): it broke the ColorOS Settings and permission UI** |
 | **Display / UI (P9b):** `settings put` on `font_scale`, `font_variation_settings`, `display_density_forced`, `peak_refresh_rate`, `min_refresh_rate`, `window_animation_scale`, `transition_animation_scale`, `animator_duration_scale`, `icon_blacklist`, `ui_night_mode`, `dark_theme*`, `theme_customization_overlay_packages`, `material_color*`, `key_ux_icon_config`, `wallpaper*`, `navigation_mode`, `time_12_24`, `accessibility_display_*`, `high_text_contrast_enabled`, any key containing `color`, `theme`, `font`, `icon`, `density`, `refresh`, `animation`, `wallpaper` | Owner decision 2026-09-25: droidforge never changes how the phone looks |
 | `wm density`, `wm size`, `wm font-scale`, `cmd display ...` writes, `cmd uimode ...` writes, `cmd wallpaper ...`, `cmd theme ...`, `cmd color_display ...` | Same |
 | `settings put` on time/date keys (`auto_time`, `auto_time_zone`, `time_zone`, `date_format`) | Owner decision: time settings are only opened, never written |
