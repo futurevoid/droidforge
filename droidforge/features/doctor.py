@@ -56,7 +56,9 @@ class DoctorReport:
 
 
 def run(device: "Device", profile: Optional["Profile"] = None, history: Optional["History"] = None,
-        save_baseline: bool = True, backup_dir: Optional[Path] = None) -> DoctorReport:
+        save_baseline: bool = True, backup_dir: Optional[Path] = None, mark_time: bool = True) -> DoctorReport:
+    """`mark_time`: an explicit doctor run is a session-level healthy confirmation (see Profile.save_healthy);
+    the TUI's automatic dashboard refresh after each plan only refreshes the values."""
     rep = DoctorReport()
     sdk = device.sdk
     rows = rep.rows
@@ -92,7 +94,7 @@ def run(device: "Device", profile: Optional["Profile"] = None, history: Optional
     rep.advice = health.advice(alerts + rep.regressions)
 
     if save_baseline and rep.healthy and profile is not None:
-        profile.healthy_baseline = h.to_dict()
+        profile.save_healthy(h, mark_time=mark_time)
         profile.note_device(device)
         if profile.path:
             profile.save()

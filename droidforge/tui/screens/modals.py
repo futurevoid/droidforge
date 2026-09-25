@@ -34,7 +34,7 @@ class MessageBox(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label(self.title_text, id="title")
-            yield Static(self.body, id="body")
+            yield Static(self.body, id="body", markup=False)
             yield Button("OK", id="ok", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -62,7 +62,7 @@ class ConfirmBox(ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label(f"[b]{self.title_text}[/b]")
-            yield Static(self.body)
+            yield Static(self.body, markup=False)
             with Horizontal():
                 yield Button(self.yes, id="yes", variant="error")
                 yield Button(self.no, id="no", variant="primary")

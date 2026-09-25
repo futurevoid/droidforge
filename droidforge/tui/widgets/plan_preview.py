@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import List
 
+from rich.markup import escape
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -75,7 +76,7 @@ class PlanPreview(ModalScreen[Confirmation]):
     def compose(self) -> ComposeResult:
         p = self.plan
         with Vertical():
-            head = f"[b]{p.title}[/b]  -  {len(p.steps)} step(s), {len(p.batches())} batch(es)"
+            head = f"[b]{escape(p.title)}[/b]  -  {len(p.steps)} step(s), {len(p.batches())} batch(es)"
             if p.expert:
                 head += "  [white on red] EXPERT [/]"
             if self.dry_run:
@@ -85,7 +86,7 @@ class PlanPreview(ModalScreen[Confirmation]):
                 for i, s in enumerate(p.steps, 1):
                     yield Static(step_text(i, s), classes="step")
             if p.notes:
-                yield Static("\n".join(f"! {n}" for n in p.notes), id="notes")
+                yield Static("\n".join(f"! {n}" for n in p.notes), id="notes", markup=False)
             if p.typed:
                 yield Label("Type exactly to confirm:", id="typed-help")
                 for n, t in enumerate(p.typed):

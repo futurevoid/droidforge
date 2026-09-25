@@ -101,7 +101,7 @@ the health gate is not done.
 - [x] **P3.4** (R-12.2) Themes: built-in list + custom "hacker" (black / green / amber) via `textual.theme.Theme`,
   switcher (key `ctrl+t` + command palette), persisted. Verbosity toggle key `v`, dry-run toggle.
 
-- [ ] **P3.5** (R-12.5) Breakage alert modal + dashboard list + `droidforge fix`: triggered by executor
+- [x] **P3.5** (R-12.5) Breakage alert modal + dashboard list + `droidforge fix`: triggered by executor
   regressions, reboot check, and startup/connect compare against the last healthy baseline. Accept: pilot test -
   sim `break_ui()` during a plan shows the modal; **Fix it** runs the undo plan and the modal reports healthy;
   a break injected between two sessions is reported at the next start; an unexplained break shows the

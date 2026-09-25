@@ -201,6 +201,13 @@ class FakePhone:
         for hook in list(self.on_boot):
             hook(self)
 
+    def unbreak_ui(self) -> None:
+        """The reverse of break_ui() (tests: a side effect that the plan's undo also reverses)."""
+        self.resolve[ACTION_SETTINGS] = COLOROS_SETTINGS
+        self.resolve[ACTION_PERMS] = COLOROS_PERMS
+        self.config.oem["mMaterialColor"] = self.settings["system"].get("material_color_value", "17179869184")
+        self.permission_monitoring_disabled = False
+
     def crash(self, pkg: str) -> None:
         n = len(self.crashes)
         self.crashes += [f"09-25 12:{n:02d}:00.000  4242  4242 E AndroidRuntime: FATAL EXCEPTION: main",

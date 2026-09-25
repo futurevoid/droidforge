@@ -25,7 +25,10 @@ from droidforge.engine.executor import RunReport
 from droidforge.engine.plan import Confirmation, Plan
 from droidforge.log import LEVEL_NAMES, LOG
 from droidforge.session import ConnectError, Session, open_session
+from droidforge.engine.health import HealthReport
+from droidforge.features import fix
 from droidforge.features.doctor import DoctorReport
+from droidforge.tui.screens.breakage import BreakageAlert
 from droidforge.tui.screens.base import Section
 from droidforge.tui.screens.dashboard import DashboardSection
 from droidforge.tui.screens.debloat import DebloatSection
@@ -82,6 +85,7 @@ class DroidforgeApp(App[None]):
         self.last_report: Optional[RunReport] = None
         self.sleep: Callable[[float], None] = time.sleep   # tests replace it (reboot check polling)
         self._pending: List[Tuple[threading.Event, Dict[str, Confirmation]]] = []
+        self.ignored: List[fix.Breakage] = []
 
     # ------------------------------------------------------------------ layout
     def compose(self) -> ComposeResult:
@@ -194,6 +198,7 @@ class DroidforgeApp(App[None]):
         LOG.ok(f"Connected: {label} ({s.device.serial})")
         current = self.query_one(ContentSwitcher).current or "dashboard"
         self.sections[current].refresh_from(self)
+        self.check_startup()  # R-12.5: breakage between sessions is caught at every connect
 
     def refresh_bar(self, **fields: str) -> None:
         s = self.session
@@ -309,13 +314,56 @@ class DroidforgeApp(App[None]):
         if on_done is not None:
             on_done(rep)
 
+    # ------------------------------------------------------------------ breakage alert (R-12.5)
     def on_breakage(self, rep: RunReport) -> None:
-        """Replaced by the breakage alert (P3.5)."""
-        body = "\n".join([str(r) for r in rep.regressions] + [str(c) for c in rep.undeclared] + list(rep.advice))
-        self.push_screen(MessageBox("Stopped: something changed that should not have", body))
+        self.show_breakage(fix.from_report(rep), rep.baseline_health)
+
+    def show_breakage(self, b: fix.Breakage, baseline: Optional[HealthReport] = None) -> None:
+        LOG.error(b.title)
+        for w in b.what_broke():
+            LOG.error(f"  {w}")
+
+        def chosen(action: Optional[str]) -> None:
+            if action == "fix" and b.repair is not None:
+                self.run_plan(b.repair, on_done=lambda rep: self._after_fix(b, baseline))
+            elif action == "devopts":
+                self.run_plan(fix.developer_options_plan())
+                self._remember(b)
+            else:
+                self._remember(b)
+        self.push_screen(BreakageAlert(b), chosen)
+
+    def _remember(self, b: fix.Breakage) -> None:
+        """Ignored alerts stay listed on the dashboard until the phone is healthy."""
+        if b not in self.ignored:
+            self.ignored.append(b)
+        self.sections["dashboard"].show_alerts(self.ignored)  # type: ignore[attr-defined]
+
+    def _after_fix(self, b: fix.Breakage, baseline: Optional[HealthReport]) -> None:
+        s = self.session
+        if s is None:
+            return
+        self.background(lambda: fix.recheck(s.device, s.profile, baseline), lambda regs: self._fixed(b, regs))
+
+    def _fixed(self, b: fix.Breakage, regs: List[Any]) -> None:
+        if not regs:
+            self.ignored.clear()
+            self.sections["dashboard"].show_alerts(self.ignored)  # type: ignore[attr-defined]
+            self.message("Healthy again", "Fix it worked: the phone is healthy again.")
+            return
+        still = fix.Breakage(b.source, regs, [], b.recent, None, "Still not right after Fix it")
+        self.show_breakage(still)
+
+    def check_startup(self) -> None:
+        s = self.session
+        if s is not None:
+            self.background(lambda: fix.check_startup(s.device, s.profile, s.history),
+                            lambda b: self.show_breakage(b) if b is not None else None)
 
     def dashboard_alerts(self, rep: DoctorReport) -> None:
-        """Hook for the breakage alert list (P3.5)."""
+        if rep.healthy and self.ignored:
+            self.ignored.clear()
+            self.sections["dashboard"].show_alerts(self.ignored)  # type: ignore[attr-defined]
 
     def run_reboot_check(self) -> None:
         rep = self.last_report

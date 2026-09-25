@@ -99,3 +99,17 @@ def test_side_effect_in_last_batch_still_offers_full_undo(sim, phone: FakePhone)
     phone.side_effects.clear()
     assert executor.run(rep.undo_plan, sim, yes).status == "done"
     assert phone.state() == initial
+
+
+def test_a_change_towards_healthy_never_stops_a_plan(sim, phone: FakePhone) -> None:
+    """Fix it on a broken phone: when the undo heals the UI, that is a recovery, not an undeclared change."""
+    phone.break_ui()
+    phone.side_effects[rf"disable-user --user 0 {TELEMETRY[0]}$"] = lambda ph: ph.unbreak_ui()
+    rep = executor.run(disable_plan(TELEMETRY[:1]), sim, yes)
+    assert rep.status == "done", ([str(r) for r in rep.regressions], [str(c) for c in rep.undeclared])
+
+
+def test_a_change_away_from_healthy_still_stops(sim, phone: FakePhone) -> None:
+    phone.side_effects[rf"disable-user --user 0 {TELEMETRY[0]}$"] = lambda ph: setattr(ph.config, "density", 400)
+    rep = executor.run(disable_plan(TELEMETRY[:1]), sim, yes)
+    assert rep.status == "stopped" and "config:density" in {c.key for c in rep.undeclared}

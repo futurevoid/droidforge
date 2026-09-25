@@ -27,7 +27,7 @@ class HistorySection(Section):
             yield Button("Undo selected", id="undo")
             yield Button("Roll back to here", id="rollback")
             yield Button("Restore changes since session start", id="restore")
-        yield Static("", id="backups")
+        yield Static("", id="backups", markup=False)
 
     def refresh_from(self, app: "DroidforgeApp") -> None:
         s = app.session

@@ -71,3 +71,9 @@ UAD_SAMPLE = {
     "com.oplus.statistics.rom": {"list": "Oem", "removal": "Recommended", "description": "User Experience Program"},
     "com.google.android.apps.photos": {"list": "Google", "removal": "Advanced", "description": "Google Photos"},
 }
+
+
+# commands that change the phone (for "nothing was written" assertions)
+WRITE_PREFIXES = ("pm disable", "pm enable", "pm suspend", "pm unsuspend", "pm uninstall", "pm grant", "pm revoke",
+                  "cmd package install-existing", "settings put", "settings delete", "cmd appops set", "ime enable",
+                  "ime disable", "ime set", "cmd locale set", "am force-stop", "cmd connectivity set", "cmd role add")

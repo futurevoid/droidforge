@@ -26,7 +26,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 LEGACY_PACKAGE_KEYS = ("disabled", "removed", "suspended", "neutered")
 LEGACY_IGNORED_KEYS = ("english", "english_prev", "device_locale_prev", "system_locales_prev", "fallback")
-DEVICE_KEYS = ("serial", "model", "fingerprint", "healthy_baseline")
+DEVICE_KEYS = ("serial", "model", "fingerprint", "healthy_baseline", "healthy_ts")
 
 # (pkg, step) -> reason it must not be re-applied automatically ("" = fine); set by engine.safety (P1.7)
 Vetter = Callable[[str], str]
@@ -57,6 +57,7 @@ class Profile:
     powerperms: Dict[str, List[str]] = field(default_factory=dict)
     root: Dict[str, Any] = field(default_factory=lambda: {"modules": [], "props_prev": {}})
     healthy_baseline: Dict[str, Any] = field(default_factory=dict)
+    healthy_ts: str = ""                                                # when that baseline was taken
     path: Optional[str] = field(default=None, repr=False, compare=False)
 
     # ------------------------------------------------------------------ storage
@@ -100,6 +101,18 @@ class Profile:
     def note_device(self, device: "Device") -> None:
         self.model = device.label
         self.fingerprint = device.fingerprint
+
+    def save_healthy(self, report: Any, mark_time: bool = True) -> None:
+        """Remember the phone as healthy now (R-12.5 compares every start against this).
+
+        `healthy_ts` marks a session-level confirmation (connect / doctor): droidforge's changes made after it
+        are the ones "involved" if the phone breaks later, e.g. after a reboot. A plan that ends healthy refreshes
+        the probe values (mark_time=False) but not that mark - its changes stay candidates until the next
+        session-level check."""
+        from datetime import datetime
+        self.healthy_baseline = report.to_dict()
+        if mark_time or not self.healthy_ts:
+            self.healthy_ts = datetime.now().isoformat(timespec="milliseconds")
 
     def ota_changed(self, device: "Device") -> bool:
         return bool(self.fingerprint) and device.fingerprint != self.fingerprint

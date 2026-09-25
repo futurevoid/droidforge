@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover
 class KeyboardSection(Section):
     def compose(self) -> ComposeResult:
         yield Label("[b]Keyboard[/b]")
-        yield Static("", id="kbd-status", classes="status")
+        yield Static("", id="kbd-status", classes="status", markup=False)
         with Horizontal(classes="buttons"):
             yield Button("Switch to Gboard", id="gboard")
             yield Button("Chinese keyboards off", id="chinese")

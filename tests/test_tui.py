@@ -84,7 +84,7 @@ from droidforge.engine.plan import Plan  # noqa: E402
 from droidforge.features import debloat  # noqa: E402
 from droidforge.tui.widgets.plan_preview import PlanPreview, commands_text  # noqa: E402
 from droidforge.tui.widgets.tables import HistoryTable, PackageTable  # noqa: E402
-from tests.helpers import UAD_SAMPLE  # noqa: E402
+from tests.helpers import UAD_SAMPLE, WRITE_PREFIXES  # noqa: E402
 
 
 async def test_preview_from_debloat_action_cancel_leaves_sim_unchanged(df_home: Path) -> None:
@@ -445,3 +445,73 @@ async def test_dry_run_toggle_sends_nothing(df_home: Path) -> None:
         assert app.session.history.entries()[-1].dry_run
         await pilot.press("d")
         assert not app.dry_run
+
+
+# ---------------------------------------------------------------- P3.5 breakage alert
+from droidforge.tui.screens.breakage import BreakageAlert  # noqa: E402
+from droidforge.tui.screens.modals import MessageBox  # noqa: E402
+
+
+async def wait_for(app: DroidforgeApp, pilot, cls, n: int = 60):
+    for _ in range(n):
+        await pilot.pause(0.05)
+        if isinstance(app.screen, cls):
+            return app.screen
+    raise AssertionError(f"{cls.__name__} never appeared (screen: {app.screen!r})")
+
+
+async def test_break_ui_during_plan_shows_alert_and_fix_it_heals(df_home: Path) -> None:
+    phone = neo8_cn()
+    phone.side_effects[r"disable-user --user 0 com\.heytap\.market$"] = lambda ph: ph.break_ui()
+    phone.side_effects[r"enable --user 0 com\.heytap\.market$"] = lambda ph: ph.unbreak_ui()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        app.run_plan(debloat.disable_plan(app.session.device, ["com.heytap.market", "com.opos.cs"], UAD_SAMPLE))
+        await run_previewed(app, pilot)
+        alert = await wait_for(app, pilot, BreakageAlert)
+        text = str(alert.query_one("#alert-text").render())
+        assert "Settings home screen" in text and "Disable permission monitoring" in text
+        assert alert.query("#devopts")  # the user turns the switch off; droidforge only opens the screen
+        alert.query_one("#fix").press()
+        await run_previewed(app, pilot)
+        healed = await wait_for(app, pilot, MessageBox)
+        assert "healthy again" in str(healed.query_one("#body").render())
+        assert phone.packages["com.heytap.market"].enabled and not phone.permission_monitoring_disabled
+
+
+async def test_break_between_sessions_reported_at_start(df_home: Path) -> None:
+    phone = neo8_cn()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)            # dashboard doctor saves the healthy baseline
+        app.run_plan(debloat.disable_plan(app.session.device, ["com.heytap.market"], UAD_SAMPLE))
+        await run_previewed(app, pilot)
+    phone.break_ui()                        # between sessions
+    app2 = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app2.run_test(size=SIZE) as pilot:
+        await settle(app2, pilot)
+        alert = await wait_for(app2, pilot, BreakageAlert)
+        text = str(alert.query_one("#alert-text").render())
+        assert "Disable com.heytap.market" in text           # what droidforge changed since the healthy check
+        assert alert.b.explained and alert.b.source == "startup"
+
+
+async def test_unexplained_break_offers_only_manual_path(df_home: Path) -> None:
+    phone = neo8_cn()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+    phone.settings["system"]["font_scale"] = "1.3"
+    n = len(phone.log)
+    app2 = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app2.run_test(size=SIZE) as pilot:
+        await settle(app2, pilot)
+        alert = await wait_for(app2, pilot, BreakageAlert)
+        assert not alert.query("#fix")
+        assert "Reset all settings" in str(alert.query_one("#alert-text").render())
+        alert.query_one("#ignore").press()
+        await settle(app2, pilot)
+        assert "Unresolved alerts" in str(app2.query_one("#alerts").render())
+    writes = [c for c in phone.log[n:] if c.startswith(WRITE_PREFIXES)]
+    assert writes == []

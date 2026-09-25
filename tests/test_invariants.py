@@ -250,7 +250,20 @@ def sc_setup_apps(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return setup.apps_plan("en-US,ar-EG")
 
 
+def sc_fix_startup(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import fix
+    h = _history_with_three(phone, dev)
+    return fix.startup_repair_plan(h.entries()[1:], h)
+
+
+def sc_fix_devopts(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import fix
+    return fix.developer_options_plan()
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.fix.startup_repair_plan": sc_fix_startup,
+    "droidforge.features.fix.developer_options_plan": sc_fix_devopts,
     "droidforge.features.english_setup.EnglishSetup.language_plan": sc_setup_language,
     "droidforge.features.english_setup.EnglishSetup.keyboard_plan": sc_setup_keyboard,
     "droidforge.features.english_setup.EnglishSetup.chinese_keyboards_plan": sc_setup_chinese,

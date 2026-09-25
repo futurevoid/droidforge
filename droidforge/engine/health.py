@@ -172,11 +172,18 @@ def _crash_increase(before: str, after: str) -> List[str]:
     return [p for p, n in a.items() if n > b.get(p, 0)]
 
 
-def compare(baseline: HealthReport, now: HealthReport, declared: Iterable[str] = ()) -> List[Regression]:
+def compare(baseline: HealthReport, now: HealthReport, declared: Iterable[str] = (),
+            reference: Optional[HealthReport] = None) -> List[Regression]:
+    """Regressions of `now` vs `baseline`. A probe that was failing and passes now, or whose value went back to the
+    last known-healthy `reference` value, is a recovery - not a regression (legacy check_health)."""
     declared = list(declared)
     regs: List[Regression] = []
     for name, cur in now.probes.items():
         base = baseline.get(name) or Probe(name, "", None)
+        ref = reference.get(name) if reference is not None else None
+        if name != "permission_monitoring" and base.value != cur.value and (
+                (base.ok is False and cur.ok is True) or (ref is not None and ref.value == cur.value)):
+            continue  # recovered
         if name == "permission_monitoring":
             if cur.ok is False:
                 regs.append(Regression(name, cur.label, base.value, cur.value, PERMISSION_MONITORING_ALERT))
@@ -194,6 +201,28 @@ def compare(baseline: HealthReport, now: HealthReport, declared: Iterable[str] =
         elif base.ok is True and cur.ok is False:
             regs.append(Regression(name, cur.label, base.value, cur.value, cur.detail))
     return regs
+
+
+# snapshot key <-> probe (for recoveries seen by the blast-radius diff)
+PROBE_KEYS = {"font_scale": "setting:system:font_scale", "night": "setting:secure:ui_night_mode",
+              "ime": "setting:secure:default_input_method", "launcher": "launcher",
+              "permission_monitoring": f"setting:{PERMISSION_MONITORING_NS}:{PERMISSION_MONITORING_KEY}"}
+
+
+def recovered_keys(baseline: HealthReport, now: HealthReport, reference: Optional[HealthReport] = None) -> List[str]:
+    """Snapshot keys whose probe got BETTER (failing -> passing, or back to the last known-healthy value).
+    A change towards healthy must never stop a plan."""
+    out = []
+    for name, cur in now.probes.items():
+        base = baseline.get(name)
+        if base is None or base.value == cur.value:
+            continue
+        ref = reference.get(name) if reference is not None else None
+        if (base.ok is False and cur.ok is True) or (ref is not None and ref.value == cur.value and cur.ok):
+            key = PROBE_KEYS.get(name) or (f"config:{name[4:]}" if name.startswith("cfg:") else "")
+            if key:
+                out.append(key)
+    return out
 
 
 def advice(regressions: Iterable[Regression]) -> Tuple[str, ...]:

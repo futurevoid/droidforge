@@ -158,6 +158,7 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
     log.trace(f"recovery script written: {rep.recovery}")
 
     declared: List[str] = list(declared_before)
+    healthy_ref = HealthReport.from_dict(profile.healthy_baseline) if profile and profile.healthy_baseline else None
 
     def waiter(stage: Step) -> bool:
         if stage.host and guard.classify(stage.cmd, True) == "reboot":
@@ -168,9 +169,10 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         """Blast-radius diff + health compare vs the baseline. True = healthy, continue."""
         now_s = snapshot.take(device, scope=scope)
         changes = snapshot.diff(base_s, now_s)
-        rep.undeclared = snapshot.undeclared(changes, declared)
         now_h = rep.final_health = health.run(device)
-        regs = health.compare(base_h, now_h, declared)
+        recovered = health.recovered_keys(base_h, now_h, healthy_ref)
+        rep.undeclared = snapshot.undeclared(changes, declared + recovered)
+        regs = health.compare(base_h, now_h, declared, reference=healthy_ref)
         pre = {p.name for p in base_h.failing}
         rep.regressions = [r for r in regs if r.probe not in pre]
         _effects(rep.results, changes)
@@ -224,7 +226,7 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         profile.apply_results(rep.results)
         profile.note_device(device)
         if rep.status == "done" and rep.final_health is not None and not rep.final_health.failing:
-            profile.healthy_baseline = rep.final_health.to_dict()
+            profile.save_healthy(rep.final_health, mark_time=False)
         if profile.path:
             profile.save()
     return rep

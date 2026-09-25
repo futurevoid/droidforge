@@ -32,7 +32,7 @@ class DebloatSection(Section):
 
     def compose(self) -> ComposeResult:
         yield Label("[b]Debloat[/b]  - no presets: you pick every package (R-4.1)")
-        yield Static(uad.status_line(), id="uad-status")
+        yield Static(uad.status_line(), id="uad-status", markup=False)
         with Horizontal(classes="buttons"):
             yield Select([("UAD-NG list", "uad"), ("Scan (China-ROM)", "scan")], value="uad", id="mode",
                          allow_blank=False)

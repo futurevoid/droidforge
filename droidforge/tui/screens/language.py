@@ -25,7 +25,7 @@ class LanguageSection(Section):
 
     def compose(self) -> ComposeResult:
         yield Label("[b]Language[/b]  (droidforge reads the device language; you change it in Settings)")
-        yield Static("", id="lang-status", classes="status")
+        yield Static("", id="lang-status", classes="status", markup=False)
         with Horizontal(classes="buttons"):
             yield Button("Open Settings > Language", id="open-lang")
             yield Button("Re-check", id="recheck")
@@ -37,7 +37,7 @@ class LanguageSection(Section):
             yield Button("2b. Chinese keyboards off", id="guide-2b")
             yield Button("3. Watch apps", id="guide-3")
             yield Button("Stop + offer", id="guide-3-stop")
-        yield Static("", id="caught")
+        yield Static("", id="caught", markup=False)
         yield Label("Per-app language - your own apps only (system apps follow the device language)",
                     classes="subtitle")
         yield SelectionList[str](id="apps")
