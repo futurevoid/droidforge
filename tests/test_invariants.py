@@ -261,7 +261,21 @@ def sc_fix_devopts(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return fix.developer_options_plan()
 
 
+def sc_telemetry(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import privacy
+    from tests.helpers import UAD_SAMPLE
+    return privacy.telemetry_plan(dev, UAD_SAMPLE, include_opt_in=True, escalate=True)
+
+
+def sc_ads(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import ads
+    from tests.helpers import UAD_SAMPLE
+    return ads.ads_plan(dev, ["magazine", "push", "launcher", "feed"], UAD_SAMPLE)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.privacy.telemetry_plan": sc_telemetry,
+    "droidforge.features.ads.ads_plan": sc_ads,
     "droidforge.features.fix.startup_repair_plan": sc_fix_startup,
     "droidforge.features.fix.developer_options_plan": sc_fix_devopts,
     "droidforge.features.english_setup.EnglishSetup.language_plan": sc_setup_language,

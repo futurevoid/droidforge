@@ -78,3 +78,27 @@ CHINESE_IME_PATTERNS = ("sogou", "sohu", "baidu", "iflytek", "qqpinyin", "tencen
                         "coloros.inputmethod", "heytap")
 SECURE_KEYBOARDS = ("com.oplus.securitykeyboard", "com.coloros.securitykeyboard")
 SECURE_KEYBOARD_FRAMEWORK = "com.oplus.onet"
+
+
+# R-5.1 telemetry preset (PACKAGES.md "Telemetry preset"). Filtered to installed packages at runtime.
+TELEMETRY = ("com.oplus.statistics.rom", "com.nearme.statistics.rom", "com.nearme.deamon", "com.oplus.crashbox",
+             "com.oplus.logkit", "com.coloros.logkit", "com.oppo.logkit", "com.oppo.logkitservice",
+             "com.oppo.logkitsdservice", "com.coloros.logkit.plugin.upload", "com.oplus.onetrace",
+             "com.oplus.locationproxy", "com.heytap.openid", "com.oplus.powermonitor", "com.oppo.oppopowermonitor",
+             "com.oplus.ocloud", "com.coloros.feedback", "com.coloros.remoteguardservice", "com.coloros.sauhelper",
+             "com.oplus.sauhelper", "com.coloros.regservice", "com.coloros.prome.service")
+TELEMETRY_OPT_IN = ("com.oplus.cosa",)   # UAD Advanced: "App enhancement" - opt-in row
+
+# R-5.4 ads / promos (PACKAGES.md "Ads / promos").
+ADS_DISABLE = {
+    "magazine": ("com.heytap.pictorial",),                    # never com.coloros.pictorial (Unsafe, locked)
+    "push": ("com.heytap.mcs", "com.coloros.mcs"),
+    "launcher": ("com.opos.cs", "com.heytap.quicksearchbox", "com.oppo.quicksearchbox", "com.nearme.instant.platform",
+                 "com.oppo.instant.local.service"),
+    "feed": ("com.coloros.assistantscreen",),
+}
+# store / theme / game-center / browser: notifications off only (theme stores are never disabled - P9b)
+ADS_NOTIFICATIONS_OFF = ("com.heytap.market", "com.oppo.market", "com.heytap.themestore", "com.nearme.themestore",
+                         "com.oplus.themestore", "com.nearme.gamecenter", "com.heytap.browser", "com.nearme.browser")
+ADS_CATEGORIES = {"magazine": "Lock-screen magazine", "push": "System push promos (+ store/theme/game/browser "
+                  "notifications off)", "launcher": "Launcher suggestions", "feed": "-1 screen feed"}

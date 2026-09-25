@@ -108,7 +108,7 @@ the health gate is not done.
   "Reset all settings" advice and no automatic writes.
 ## Phase 4 - Neo 8 features
 
-- [ ] **P4.1** `features/privacy.py` telemetry preset (R-5.1) + `features/ads.py` (R-5.4).
+- [x] **P4.1** `features/privacy.py` telemetry preset (R-5.1) + `features/ads.py` (R-5.4).
 - [ ] **P4.2** `features/dns.py` Private DNS menu, AdGuard default (R-5.2).
 - [ ] **P4.3** Install hijack (R-5.3).
 - [ ] **P4.4** `features/firewall.py` chain3 (R-5.5): capability probe, block/unblock any app, detect missing rules on
