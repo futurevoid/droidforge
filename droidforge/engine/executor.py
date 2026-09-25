@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Callable, List, Optional, Protocol, Sequence, 
 
 from droidforge.adb.backend import RunResult
 from droidforge.adb.hostcmd import run_host
-from droidforge.engine import guard, health, recovery, snapshot, undo
+from droidforge.engine import guard, health, recovery, safety, snapshot, undo
 from droidforge.engine.health import HealthReport, Probe, Regression
 from droidforge.engine.plan import Confirmation, Plan, Step, StepResult
 from droidforge.engine.snapshot import Change, Snapshot
@@ -93,16 +93,17 @@ def _send(step: Step, device: "Device") -> RunResult:
 
 def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = False,
         history: Optional[History] = None, recovery_dir: Optional[Path] = None,
-        profile: Optional["Profile"] = None) -> RunReport:
+        profile: Optional["Profile"] = None, expert_mode: bool = False) -> RunReport:
     log = device.log
     rep = RunReport(plan=plan, batches_total=len(plan.batches()))
 
-    # 1. guard - before anything is shown as runnable
+    # 1. guard + locked-package check - before anything is shown as runnable
     try:
         for s in plan.steps:
             guard.check(s, device)
-            if s.risk == "locked" and not plan.expert:
+            if s.risk == "locked" and not (plan.expert and expert_mode):
                 raise guard.GuardError(s.cmd, "locked package outside expert mode (R-4.3)")
+        safety.check_plan(plan, safety.SafetyContext.from_device(device), expert_mode)
     except guard.GuardError as e:
         rep.status, rep.error = "refused", str(e)
         log.error(f"Plan refused by the guard: {e.reason} ({e.cmd})")

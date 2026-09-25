@@ -55,7 +55,7 @@ def test_escalation_entry_undoes_the_applied_stage(sim, phone: FakePhone) -> Non
 def test_dry_run_and_failed_entries_not_undoable(sim, phone: FakePhone) -> None:
     h = History(phone.serial)
     executor.run(disable_plan(TELEMETRY[:1]), sim, yes, history=h, dry_run=True)
-    executor.run(Plan("Force", [force_step("com.oplus.safecenter")]), sim, yes, history=h)
+    executor.run(Plan("Force", [force_step("com.coloros.prome.service")]), sim, yes, history=h)
     es = h.entries()
     assert es[0].dry_run and not es[0].undoable
     assert not es[1].ok and not es[1].undoable

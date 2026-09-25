@@ -269,6 +269,7 @@ def neo8_cn() -> FakePhone:
     ph.packages["com.android.systemui"].uid = 10050
     ph.packages["com.oplus.sauhelper"].refuse = {"disable"}              # legacy mock: protected, suspend works
     ph.packages["com.oplus.safecenter"].refuse = {"disable", "suspend"}  # legacy mock: suspend refused too
+    ph.packages["com.coloros.prome.service"].refuse = {"disable", "suspend"}  # not locked, ROM refuses both
     ph.packages["com.tencent.mm"].locales = "zh-CN"
     ph.imes = {IME_SOGOU: True, IME_BAIDU: True, IME_SECURE: True, IME_GBOARD: False}
     ph.settings["secure"].update({

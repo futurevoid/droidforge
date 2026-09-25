@@ -48,7 +48,7 @@ def test_fallback_escalation(sim, phone: FakePhone) -> None:
 
 
 def test_escalation_exhausted(sim, phone: FakePhone) -> None:
-    p = "com.oplus.safecenter"  # disable and suspend both refused
+    p = "com.coloros.prome.service"  # disable and suspend both refused
     rep = executor.run(Plan("Force-disable", [force_step(p)]), sim, yes)
     assert not rep.results[0].ok and rep.results[0].applied == []
     assert rep.status == "done" and not rep.ok

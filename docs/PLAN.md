@@ -55,7 +55,7 @@ the health gate is not done.
 - [x] **P1.6** (R-2.4) `engine/profile.py` per-device desired state, export/import (import = previewed plan, P14),
   legacy `cnrom_state.json` import of package keys only (language keys ignored). Accept: round-trip; legacy
   sample with `english`/`device_locale_prev` imports without creating any language step.
-- [ ] **P1.7** `engine/safety.py` verdicts (locked/guarded/expert/keep/unknown/ok), typed requirements, R-4.3b UI
+- [x] **P1.7** `engine/safety.py` verdicts (locked/guarded/expert/keep/unknown/ok), typed requirements, R-4.3b UI
   infrastructure hidden+locked. Accept: locked package without typed name is rejected by the executor; overlays
   are absent from default package lists.
 - [ ] **P1.8** `tests/test_invariants.py`: for every registered plan builder on the sim - every write step passes
