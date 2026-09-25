@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from droidforge import config
@@ -27,6 +28,11 @@ class Session:
     expert: bool = False
     dry_run: bool = False
     phone: Optional[FakePhone] = None   # the simulated phone (only with --simulate)
+
+    def start(self) -> Path:
+        """Session start (R-11.3): full read-only snapshot saved as evidence and diff baseline."""
+        from droidforge.features.backup import session_backup
+        return session_backup(self.device)
 
 
 def pick_serial(rows: List[Tuple[str, str]], wanted: Optional[str]) -> str:

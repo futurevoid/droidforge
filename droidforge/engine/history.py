@@ -111,7 +111,7 @@ class History:
         undo_cmds = [u for st in applied for u in st.undo]
         tail = "\n".join(f"{result.out}\n{result.err}".strip().splitlines()[-OUT_TAIL_LINES:])
         e = Entry(id=f"{datetime.now():%Y%m%d%H%M%S}-{uuid.uuid4().hex[:6]}",
-                  ts=datetime.now().isoformat(timespec="seconds"), serial=self.serial,
+                  ts=datetime.now().isoformat(timespec="milliseconds"), serial=self.serial,
                   fingerprint=_fingerprint(device), plan_id=plan.id, plan_title=plan.title,
                   category=result.requested.category, label=stage.label, cmd=stage.cmd, ok=result.ok,
                   exit=result.exit, out_tail=tail, undo=undo_cmds, touches=[t for st in applied for t in st.touches]

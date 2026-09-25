@@ -109,7 +109,7 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
     scope = sorted(set(scope))
     device.invalidate("snapshot reads fresh state")  # a change made outside droidforge must be seen
     s = Snapshot(serial=device.serial or "", fingerprint=device.fingerprint,
-                 ts=datetime.now().isoformat(timespec="seconds"))
+                 ts=datetime.now().isoformat(timespec="milliseconds"))
     for ns in NAMESPACES:
         s.settings[ns] = parse.settings_list(device.read(f"settings list {ns}").out)
     present = device.packages("-u")

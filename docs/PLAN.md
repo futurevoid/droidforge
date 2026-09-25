@@ -82,7 +82,7 @@ the health gate is not done.
 - [x] **P2.3** `data/uad.py` + `features/debloat.py` (R-4.x): list/filter/tiers, neededBy notes, actions incl.
   force escalation (disable->suspend->remove; firewall+neuter hook left for P4.5), neuter/un-neuter,
   keep-list, guarded phrase. Accept: port of legacy mock scenarios (protected package, suspend refused, etc.).
-- [ ] **P2.4** `features/backup.py` (R-11.3): session-start snapshot saved to disk (evidence + diff baseline);
+- [x] **P2.4** `features/backup.py` (R-11.3): session-start snapshot saved to disk (evidence + diff baseline);
   restore only of keys droidforge changed, via history. No blanket restore.
 - [ ] **P2.5** "English setup" guide (replaces legacy menu `e`): step 1 opens Language settings and waits for the
   user; step 2 offers Gboard + Chinese-IME switch (R-3.4); step 3 lists apps still showing Chinese via the

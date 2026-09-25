@@ -216,7 +216,16 @@ def sc_debloat_restore(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return debloat.restore_plan(dev, ["com.heytap.mcs", "com.opos.cs"], UAD_SAMPLE)
 
 
+def sc_backup_restore(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import backup
+    h = History(phone.serial)
+    path = backup.session_backup(dev, tmp)
+    assert executor.run(disable_plan(TELEMETRY[:2]), dev, yes, history=h).status == "done"
+    return backup.restore_plan(dev, h, path)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.backup.restore_plan": sc_backup_restore,
     "droidforge.features.debloat.disable_plan": sc_debloat_disable,
     "droidforge.features.debloat.remove_plan": sc_debloat_remove,
     "droidforge.features.debloat.force_plan": sc_debloat_force,
