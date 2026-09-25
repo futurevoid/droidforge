@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Checkbox, Label, SelectionList, Static
 
-from droidforge.features.audit import perms, signers
+from droidforge.features.audit import net, perms, signers
 from droidforge.tui.screens.base import Section
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -29,15 +29,43 @@ class AuditSection(Section):
         yield SelectionList[str](id="audit-perms")
         yield Label("Signers", classes="subtitle")
         yield Static("", id="audit-signers", markup=False)
+        yield Label("Live connections", classes="subtitle")
+        with Horizontal(classes="buttons"):
+            yield Button("Refresh connections", id="audit-net")
+            yield Checkbox("auto-refresh every 3 s", id="audit-net-auto")
+            yield Checkbox("show listening / loopback", id="audit-net-all")
+        yield Static("", id="audit-conns", markup=False)
 
     def refresh_from(self, app: "DroidforgeApp") -> None:
         pass
+
+    def on_mount(self) -> None:
+        self.set_interval(3.0, self._auto_net)
+
+    def _auto_net(self) -> None:
+        if self.display and self.query_one("#audit-net-auto", Checkbox).value:
+            self._net()
+
+    def _net(self) -> None:
+        dev = self.device
+        if dev is None:
+            return
+        allc = self.query_one("#audit-net-all", Checkbox).value
+        self.dapp.background(lambda: net.scan(dev, allc, allc), self._show_net)
+
+    def _show_net(self, rep: "net.NetReport") -> None:
+        lines = [rep.note] if rep.note else []
+        lines += [f"{c.proto:<5} {c.local:<26} {c.remote:<26} {c.state:<12} {', '.join(c.apps) or c.uid}"
+                  for c in rep.conns]
+        self.query_one("#audit-conns", Static).update("\n".join(lines) or "no connections")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         app, dev = self.dapp, self.device
         if dev is None:
             return
-        if event.button.id == "audit-scan":
+        if event.button.id == "audit-net":
+            self._net()
+        elif event.button.id == "audit-scan":
             app.background(lambda: perms.scan(dev), self.show)
         elif event.button.id == "audit-revoke":
             picks = [tuple(v.split("|", 1)) for v in self.query_one("#audit-perms", SelectionList).selected]

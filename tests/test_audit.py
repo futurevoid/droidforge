@@ -62,3 +62,46 @@ async def test_tui_audit_revoke(df_home) -> None:
         app.query_one("#audit-revoke").press()
         await run_previewed(app, pilot)
         assert not phone.packages["com.whatsapp"].perms["android.permission.CAMERA"]
+
+
+# ---------------------------------------------------------------- P6.3 connections, P6.4 CLI JSON
+def test_proc_net_parse() -> None:
+    from droidforge.features.audit import net
+    assert net._addr("0100007F:1F90") == "127.0.0.1:8080"
+    assert net._addr("0000000000000000FFFF00000501A8C0:C001") == "192.168.1.5:49153"
+    assert net._addr("00000000000000000000000001000000:0035") == "::1:53"
+
+
+def test_connections(sim, phone: FakePhone) -> None:
+    from droidforge.features.audit import net
+    rep = net.scan(sim)
+    by = {c.proto: c for c in rep.conns}
+    assert by["tcp"].apps == ["com.whatsapp"] and by["tcp"].state == "ESTABLISHED"
+    assert by["tcp"].remote == "157.240.33.26:443"
+    assert by["tcp6"].apps == ["org.telegram.messenger"] and by["tcp6"].remote.endswith(":443")
+    assert by["udp"].apps == ["netd / DNS"] and by["udp"].remote == "8.8.8.8:53"
+    assert not any(c.state == "LISTEN" for c in rep.conns)
+    assert any(c.state == "LISTEN" for c in net.scan(sim, include_listen=True, include_loopback=True).conns)
+
+
+def test_connections_blocked(sim, phone: FakePhone) -> None:
+    from droidforge.features.audit import net
+    phone.proc_net = {k: [] for k in phone.proc_net}
+    rep = net.scan(sim)
+    assert rep.blocked and "SELinux" in rep.note
+
+
+def test_cli_audit_json(monkeypatch, capsys, df_home) -> None:
+    import json
+
+    from droidforge import cli
+    from droidforge.adb.sim import neo8_cn
+    from droidforge.session import open_session
+    phone = neo8_cn()
+    monkeypatch.setattr(cli, "SESSION_FACTORY", lambda **kw: open_session(phone=phone, **kw))
+    for what in ("perms", "signers", "net"):
+        assert cli.main(["-q", "--simulate", "audit", what, "--json"]) == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data
+    assert cli.main(["-q", "--simulate", "audit", "net"]) == 0
+    assert "com.whatsapp" in capsys.readouterr().out

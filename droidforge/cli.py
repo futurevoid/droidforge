@@ -112,6 +112,10 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     rb = sub.add_parser("rollback", help="undo an entry and everything newer")
     rb.add_argument("id")
     sub.add_parser("uad-update", help="download the UAD-NG package list (about 1.6 MB, GitHub)")
+    au = sub.add_parser("audit", help="read-only audit: perms / signers / net (--json for scripts)")
+    au.add_argument("what", choices=["perms", "signers", "net"])
+    au.add_argument("--json", action="store_true")
+    au.add_argument("--all", action="store_true", help="include system apps / listening + loopback sockets")
     pr = sub.add_parser("pair", help="pair a phone over Wi-Fi (QR code, or --code IP:PORT CODE)")
     pr.add_argument("--code", nargs=2, metavar=("IP:PORT", "CODE"))
     pr.add_argument("--connect", metavar="IP:PORT", help="connect address after pairing with a code")
@@ -320,6 +324,43 @@ def run_cli_plan(s: Session, plan: Plan, yes: bool) -> int:
     return 0
 
 
+def cmd_audit(s: Session, what: str, as_json: bool, include_all: bool) -> int:
+    import json
+
+    from droidforge.features.audit import net, perms, signers
+    dev = s.device
+    if what == "perms":
+        apps = [a for a in perms.scan(dev) if include_all or not a.system]
+        if as_json:
+            print(json.dumps([a.to_dict() for a in apps], indent=1))
+        else:
+            for p, item, kind in perms.rows(apps, include_all):
+                print(ascii_safe(f"{p:<45} {kind:<10} {item}"))
+    elif what == "signers":
+        groups = signers.group(perms.scan(dev, with_ops=False))
+        if as_json:
+            print(json.dumps([{"digest": g.digest, "label": g.label, "packages": g.packages} for g in groups],
+                             indent=1))
+        else:
+            for g in groups:
+                print(ascii_safe(f"{g.label:<30} {g.digest[:16]:<16} {len(g.packages):>3}  "
+                                 + ", ".join(g.packages[:8])))
+    else:
+        rep = net.scan(dev, include_all, include_all)
+        if as_json:
+            print(json.dumps({"blocked": rep.blocked, "note": rep.note, "connections": [c.to_dict()
+                                                                                         for c in rep.conns]},
+                             indent=1))
+        else:
+            if rep.note:
+                print(ascii_safe(rep.note))
+            for c in rep.conns:
+                print(ascii_safe(f"{c.proto:<5} {c.local:<24} {c.remote:<24} {c.state:<12} "
+                                 f"{','.join(c.apps) or c.uid}"))
+        return 2 if rep.blocked else 0
+    return 0
+
+
 def cmd_history(s: Session) -> int:
     for e in s.history.entries():
         state = "dry-run" if e.dry_run else "undone" if e.undone else "ok" if e.ok else "failed"
@@ -385,6 +426,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return cmd_fix(s, args.yes)
         if args.command == "history":
             return cmd_history(s)
+        if args.command == "audit":
+            return cmd_audit(s, args.what, args.json, args.all)
         if args.command == "uad-update":
             from droidforge.data import uad
             ok, msg = uad.update()

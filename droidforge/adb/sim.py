@@ -140,7 +140,19 @@ class FakePhone:
         self.shizuku_running = False
         self.mdns: List[Tuple[str, str, str]] = []    # (name, service type, ip:port) seen by `adb mdns services`
         self.pairing: Optional[Tuple[str, str]] = None  # (name, password) the phone scanned from the QR code
-        self.proc_net: List[str] = []
+        tcp_h = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode"
+        udp_h = tcp_h + " ref pointer drops"
+        self.proc_net: Dict[str, List[str]] = {
+            "/proc/net/tcp": [tcp_h,
+                              "   0: 0100007F:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000 0 1",
+                              "   1: 0501A8C0:B3E2 1A21F09D:01BB 01 00000000:00000000 00:00000000 00000000 10103 0 2"],
+            "/proc/net/tcp6": [tcp_h,
+                               "   0: 0000000000000000FFFF00000501A8C0:C001 0000000000000000FFFF00002EFDAE8E:01BB 01 "
+                               "00000000:00000000 00:00000000 00000000 10104 0 3"],
+            "/proc/net/udp": [udp_h,
+                              "   0: 0501A8C0:D431 08080808:0035 07 00000000:00000000 00:00000000 00000000  1051 0 4"],
+            "/proc/net/udp6": [udp_h],
+        }
         self.focused = "com.android.launcher"
         self.deviceidle: Set[str] = set()             # user battery-optimisation whitelist
         self.standby: Dict[str, int] = {}             # app standby buckets (default 30 frequent)
@@ -347,6 +359,9 @@ def neo8_cn() -> FakePhone:
                                   "verifier_verify_adb_installs": "1"})
     ph.permission_monitoring_disabled = False
     ph.set_device_locales(["zh-Hans-CN", "en-US"])
+    for fake, pkg in (("10103", "com.whatsapp"), ("10104", "org.telegram.messenger")):   # live connections
+        for f, lines in ph.proc_net.items():
+            ph.proc_net[f] = [ln.replace(f" {fake} ", f" {ph.packages[pkg].uid} ") for ln in lines]
     ph.resolve.update({ACTION_SETTINGS: COLOROS_SETTINGS, ACTION_PERMS: COLOROS_PERMS, HOME: COLOROS_LAUNCHER})
     ph.roles = {"android.app.role.BROWSER": ["com.heytap.browser"], "android.app.role.SMS": ["com.android.mms"],
                 "android.app.role.DIALER": ["com.android.contacts"], "android.app.role.HOME": ["com.android.launcher"]}
@@ -564,6 +579,12 @@ class SimBackend:
         if self.phone.root is None:
             return R(127, "", "/system/bin/sh: su: inaccessible or not found", 1)
         raise Unsupported(" ".join(t))  # root commands are simulated in Phase 7
+
+    def _c_cat(self, t: List[str]) -> RunResult:
+        files = t[1:]
+        if not files or not all(f in self.phone.proc_net for f in files):
+            raise Unsupported(" ".join(t))
+        return _ok("\n".join(line for f in files for line in self.phone.proc_net[f]))
 
     def _c_echo(self, t: List[str]) -> RunResult:
         return _ok(" ".join(t[1:]))

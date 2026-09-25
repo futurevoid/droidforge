@@ -136,7 +136,7 @@ the health gate is not done.
 ## Phase 6 - Audit
 
 - [x] **P6.1** `audit/perms.py` + table with revoke (R-8.1). **P6.2** `audit/signers.py` (R-8.2).
-- [ ] **P6.3** `audit/net.py` live connections (R-8.3). **P6.4** audit JSON output in CLI.
+- [x] **P6.3** `audit/net.py` live connections (R-8.3). **P6.4** audit JSON output in CLI.
 
 ## Phase 7 - Root mode (moved to v2 by owner decision, 2026-09-25)
 
