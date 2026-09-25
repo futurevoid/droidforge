@@ -35,6 +35,7 @@ from droidforge.tui.screens.dashboard import DashboardSection
 from droidforge.tui.screens.firewall import FirewallSection
 from droidforge.tui.screens.keepalive import KeepAliveSection
 from droidforge.tui.screens.privacy import PrivacySection
+from droidforge.tui.screens.tools import ToolsSection
 from droidforge.tui.screens.debloat import DebloatSection
 from droidforge.tui.screens.history import HistorySection
 from droidforge.tui.screens.keyboard import KeyboardSection
@@ -66,13 +67,15 @@ SECTIONS: List[Tuple[str, str]] = [
     ("firewall", "Firewall"),
     ("apps", "Apps & defaults"),
     ("keepalive", "Keep-alive & perms"),
+    ("tools", "Tools"),
     ("history", "Backup & History"),
 ]
 
 
 SECTION_CLASSES = {"dashboard": DashboardSection, "language": LanguageSection, "keyboard": KeyboardSection,
                    "debloat": DebloatSection, "privacy": PrivacySection, "firewall": FirewallSection,
-                   "apps": AppsSection, "keepalive": KeepAliveSection, "history": HistorySection}
+                   "apps": AppsSection, "keepalive": KeepAliveSection, "tools": ToolsSection,
+                   "history": HistorySection}
 
 
 class DroidforgeApp(App[None]):
@@ -224,6 +227,7 @@ class DroidforgeApp(App[None]):
         self.check_startup()  # R-12.5: breakage between sessions is caught at every connect
         self.check_firewall()  # R-5.5 / P14: rules cleared by a reboot -> ask, never re-apply on our own
         self.check_ota()       # R-2.5 / P14: system update detected -> show what it undid, ask
+        self.check_shizuku()   # R-2.3 / P14: installed but stopped -> ask to start it
 
     def refresh_bar(self, **fields: str) -> None:
         s = self.session
@@ -383,6 +387,20 @@ class DroidforgeApp(App[None]):
             return
         still = fix.Breakage(b.source, regs, [], b.recent, None, "Still not right after Fix it")
         self.show_breakage(still)
+
+    def check_shizuku(self) -> None:
+        s = self.session
+        if s is None:
+            return
+        from droidforge.features import shizuku
+
+        def ask(st: str) -> None:
+            if st == "stopped":
+                self.push_screen(ConfirmBox("Start Shizuku?", "Shizuku is installed but not running (it stops at "
+                                            "every reboot). Start it now? You will see the command first.",
+                                            "Start", "Not now"),
+                                 lambda yes: self.run_plan(lambda: shizuku.start_plan(s.device)) if yes else None)
+        self.background(lambda: shizuku.status(s.device), ask)
 
     def check_ota(self) -> None:
         s = self.session

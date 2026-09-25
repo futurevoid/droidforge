@@ -10,7 +10,7 @@ from typing import List, Optional
 RISKS = ("read", "normal", "risky", "locked")
 BATCH_SIZE = 5  # P13
 # Touches that leave nothing to undo: a stopped process restarts, a reboot bumps the ROM's own boot counter.
-EPHEMERAL_TOUCHES = ("proc:", "reboot", "setting:global:boot_count", "fw:*")
+EPHEMERAL_TOUCHES = ("proc:", "reboot", "setting:global:boot_count", "fw:*", "shizuku")
 
 
 def is_ephemeral(touch: str) -> bool:

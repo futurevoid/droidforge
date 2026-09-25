@@ -129,6 +129,7 @@ Nothing here. All display/UI commands moved to "Forbidden".
 | mDNS discovery (host) | `adb mdns check`, `adb mdns services` (look for `<name>` with `_adb-tls-pairing._tcp`, then `_adb-tls-connect._tcp`) | S |
 | Pair / connect (host) | `adb pair <ip>:<port> <password>`, `adb connect <ip>:<port>` | S |
 | Shizuku path | `pm path moe.shizuku.privileged.api` -> replace `base.apk` with `lib/arm64/libshizuku.so` and run that path | S ([Shizuku discussion #462](https://github.com/RikkaApps/Shizuku/discussions/462), [DeepWiki](https://deepwiki.com/RikkaApps/Shizuku/3.3-adb-startup-method)) |
+| Shizuku status | `pidof shizuku_server` (non-empty = running) | V (process name) |
 | Shizuku fallback | `sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh` | S (older versions) |
 | Shizuku APK | GitHub API `https://api.github.com/repos/RikkaApps/Shizuku/releases/latest` -> `.apk` asset | S |
 

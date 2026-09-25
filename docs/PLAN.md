@@ -132,7 +132,8 @@ the health gate is not done.
     droidforge never tells the user to enable any developer-option switch (the same applies to USB debugging in
     the "no device" message). (a) allow naming USB / Wireless debugging only, or (b) never name any developer
     option? Built with neutral wording until answered; task stays open.
-- [ ] **P5.2** `features/shizuku.py` install from GitHub release + auto-start on connect + status (R-2.3).
+- [x] **P5.2** `features/shizuku.py` install from GitHub release + auto-start on connect + status (R-2.3).
+  - "Auto-start on every connect" is done as an ASK on every connect (P14 overrides: nothing runs unconfirmed).
 - [ ] **P5.3** `tools/scrcpy.py` (R-9.1) with pacman hint. **P5.4** `tools/logcat.py` streaming pane (R-9.2).
 - [ ] **P5.5** `tools/activities.py` curated intents + exported-activity browser (R-9.3).
   **P5.6** `tools/shell.py` pane (R-9.4).

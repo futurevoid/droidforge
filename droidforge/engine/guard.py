@@ -154,7 +154,7 @@ RULES: Tuple[Rule, ...] = (
     R("resolve-perms", r"cmd package resolve-activity --brief -a android\.intent\.action\.MANAGE_APP_PERMISSIONS",
       ((HP, "Permission UI"),)),
     R("crash-buffer", r"logcat -b crash -d -t [0-9]{1,4}", ((HP, "Crashes"),)),
-    R("pidof", rf"pidof {PKG}", ((HP, "Process alive"), (TO, "logcat (host stream)"))),
+    R("pidof", rf"pidof {PKG}", ((HP, "Process alive"), (TO, "logcat (host stream)"), (WS, "Shizuku status"))),
     R("connectivity-help", r"cmd connectivity help", ((FW, "Capability probe"),)),
     R("fw-get", rf"cmd connectivity get-package-networking-enabled {PKG}", ((FW, "Read app block state"),)),
     R("role-get", rf"cmd role get-role-holders --user 0 {ROLES}|cmd role help", ((AP, "Role holders"),)),

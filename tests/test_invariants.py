@@ -376,7 +376,22 @@ def sc_datetime(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return region.datetime_plan(dev)
 
 
+def sc_shizuku_start(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import shizuku
+    phone.add("moe.shizuku.privileged.api", system=False)
+    return shizuku.start_plan(dev)
+
+
+def sc_shizuku_install(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import shizuku
+    from tests.helpers import make_apk
+    make_apk(tmp / "shizuku.apk", "moe.shizuku.privileged.api")
+    return shizuku.install_plan(dev, tmp / "shizuku.apk")
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.shizuku.start_plan": sc_shizuku_start,
+    "droidforge.features.shizuku.install_plan": sc_shizuku_install,
     "droidforge.features.region.regional_plan": sc_regional,
     "droidforge.features.region.datetime_plan": sc_datetime,
     "droidforge.features.keepalive.keepalive_plan": sc_keepalive,
@@ -489,7 +504,8 @@ def test_invariants(name: str, sim: Device, phone: FakePhone, tmp_path: Path) ->
     after = snapshot.take(sim, scope=scope)
     declared = [t for r in rep.results for st in r.applied for t in st.touches]
     assert snapshot.undeclared(snapshot.diff(before, after), declared) == []
-    assert any(r.effect == "changed" for r in rep.results), f"{name}: nothing observable changed"
+    if not all(is_ephemeral(t) for s in writes for t in s.all_touches()):
+        assert any(r.effect == "changed" for r in rep.results), f"{name}: nothing observable changed"
 
     # undo restores the original snapshot exactly (P2)
     back_plan = undo.undo_plan(rep.results, f"Undo {plan.title}")

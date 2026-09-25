@@ -23,6 +23,7 @@ from droidforge.adb.backend import EXIT_NOT_FOUND, RunResult
 from droidforge.data.device_keys import PERMISSION_MONITORING_KEY, PERMISSION_MONITORING_NS
 
 SIM_SERIAL = "SIMNEO8CN01"
+SHIZUKU = "moe.shizuku.privileged.api"
 
 
 COLOROS_SETTINGS = "com.android.settings/com.oplus.settings.feature.homepage.OplusSettingsHomepageActivity"
@@ -196,6 +197,7 @@ class FakePhone:
         """Instant reboot: boot hooks run, the crash buffer and running apps reset, boot_count increments, and
         `sys.boot_completed` reads empty for a few polls (the executor must wait for it)."""
         self.boots += 1
+        self.shizuku_running = False
         self.crashes = []
         self.firewall_chain3 = False          # platform behaviour: chain-3 rules are cleared at reboot
         self.firewall_blocked = set()
@@ -482,6 +484,12 @@ class SimBackend:
         return r
 
     def _shell(self, cmd: str) -> RunResult:
+        if re.fullmatch(r"/data/app/\S+/lib/arm64/libshizuku\.so", cmd) or \
+                cmd == "sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh":
+            if not self.phone.pkg_ok(SHIZUKU):
+                return R(127, "", f"/system/bin/sh: {cmd.split()[-1]}: not found", 1)
+            self.phone.shizuku_running = True
+            return _ok("info: starter begin\ninfo: shizuku_server started")
         m = re.fullmatch(r"sh -c (.+)", cmd, re.S)
         if m:
             return self._shell(shlex.split(m.group(1))[0])
@@ -544,6 +552,8 @@ class SimBackend:
         return _ok(self.phone.props.get(t[1], ""))
 
     def _c_pidof(self, t: List[str]) -> RunResult:
+        if t[1:] == ["shizuku_server"]:
+            return _ok("31337") if self.phone.shizuku_running else R(1, "", "", 1)
         p = self.phone.packages.get(t[1])
         if p and p.running and self.phone.pkg_ok(p.name):
             return _ok(str(1000 + p.uid % 9000))
