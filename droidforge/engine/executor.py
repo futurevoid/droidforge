@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Protocol, Sequence, Tuple, Union
 
-from droidforge.adb import labels
 from droidforge.adb.backend import RunResult
 from droidforge.adb.hostcmd import run_host
 from droidforge.engine import guard, health, recovery, safety, snapshot, undo
@@ -129,9 +128,7 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         log.error(f"Plan refused by the guard: {e.reason} ({e.cmd})")
         return rep
 
-    # 2. confirm (P1) - with each package's app name next to it, so the right app is picked
-    if plan.packages() and not plan.names:
-        plan.names.update(labels.lookup(device, plan.packages()))
+    # 2. confirm (P1)
     ok, why = _typed_ok(plan, confirm(plan))
     if not ok:
         rep.status, rep.error = ("cancelled", "") if why == "cancelled" else ("refused", why)

@@ -9,8 +9,8 @@ import pytest
 
 from droidforge.adb import labels
 from droidforge.adb.sim import FakePhone, _element, _pool, fake_arsc, fake_manifest
-from droidforge.engine import executor, guard
-from tests.helpers import disable_plan, make_apk
+from droidforge.engine import guard
+from tests.helpers import make_apk
 
 
 def test_english_first_then_default() -> None:
@@ -75,27 +75,3 @@ def test_guard_allows_only_the_two_label_reads() -> None:
             guard.check_read(bad)
     with pytest.raises(labels.LabelError):
         labels.unzip_cmd("/x'.apk", "AndroidManifest.xml")
-
-
-def test_plan_preview_names_the_app(sim, phone: FakePhone) -> None:
-    from droidforge import cli
-    seen = []
-
-    def confirm(plan):
-        seen.extend(cli.preview_lines(plan))
-        return False
-    executor.run(disable_plan(["com.heytap.market"]), sim, confirm)
-    assert any('com.heytap.market' in line and 'app: "App Market"' in line for line in seen)
-    assert phone.packages["com.heytap.market"].enabled
-
-
-def test_debloat_rows_carry_names(sim) -> None:
-    from droidforge.features import debloat
-    rows = debloat.scan(sim, {}, "market")
-    assert {r.pkg: r.name for r in rows}["com.heytap.market"] == "App Market"
-
-
-def test_names_never_break_a_plan(sim, phone: FakePhone, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(labels, "apk_paths", lambda d: (_ for _ in ()).throw(RuntimeError("boom")))
-    rep = executor.run(disable_plan(["com.heytap.market"]), sim, lambda p: True)
-    assert rep.status == "done" and not phone.packages["com.heytap.market"].enabled

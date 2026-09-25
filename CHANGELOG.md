@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 - 2026-09-25
+
+- App names are no longer loaded automatically: reading them from every APK used too much time and phone
+  resources and broke package loading. Package lists, pickers and previews work as in 1.0.x again.
+- `doctor` no longer checks the "Disable permission monitoring" switch (owner decision).
+
 ## 1.1.0 - 2026-09-25
 
 - App names next to package names (plan preview, debloat list, keep-alive / firewall pickers, CLI keep-alive

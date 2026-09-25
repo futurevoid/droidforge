@@ -314,11 +314,9 @@ def pick_keepalive(dev: "Device", remove: bool, ask: Optional[Callable[[str], st
     if not items:
         print("No apps to pick." if not remove else "No app is kept alive by droidforge.")
         return []
-    from droidforge.adb import labels
-    names = labels.lookup(dev, items)
     w = len(str(len(items)))
     for n, p in enumerate(items, 1):
-        print(ascii_safe(f" {n:>{w}}) {names.get(p, ''):<24.24} {p:<44} {('[' + st[p] + ']') if st.get(p) else ''}"))
+        print(ascii_safe(f" {n:>{w}}) {p:<48} {('[' + st[p] + ']') if st.get(p) else ''}"))
     try:
         text = (ask or input)("Pick apps (e.g. 1,4,7 or 2-9; Enter = cancel): ")
     except EOFError:
