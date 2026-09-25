@@ -91,6 +91,7 @@ Rules are cleared on reboot (ShizuWall README). Re-apply on connect.
 | Purpose | Command | Undo | Status |
 |---|---|---|---|
 | Open Play page | `am start -a android.intent.action.VIEW -d 'market://details?id=<p>'` | - | L |
+| Official APK sources (host HTTPS, only when the user asks) | GitHub `https://api.github.com/repos/<owner>/<repo>/releases/latest` -> `.apk` asset; F-Droid `https://f-droid.org/repo/index-v1.json` -> `https://f-droid.org/repo/<apkName>`; Firefox Nightly `https://download.mozilla.org/?product=fenix-nightly-latest&os=android&lang=multi` | - | S (GitHub, F-Droid docs); Mozilla URL: V (dev host proxy returned 403 on 2026-09-25) |
 | Install APK(s) (host) | `adb install -r <apk>` / `adb install-multiple -r <apks...>` | `pm uninstall <p>` (user app) | S |
 | Role holders | `cmd role get-role-holders --user 0 <role>` / `cmd role add-role-holder --user 0 <role> <p>` | re-add previous holder | V (syntax per RoleShellCommand; confirm with `cmd role help`) |
 | Keep-alive | `dumpsys deviceidle whitelist +<p>` (undo `-<p>`); `cmd appops set <p> RUN_ANY_IN_BACKGROUND allow` (undo previous mode); `am set-standby-bucket <p> active` (undo previous from `am get-standby-bucket <p>`) | as listed | S (AOSP); ColorOS still kills: V |

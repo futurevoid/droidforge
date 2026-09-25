@@ -308,7 +308,33 @@ def sc_force_last_stage(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return debloat.force_plan(dev, ["com.heytap.market"], UAD_SAMPLE)
 
 
+def sc_play(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import apps
+    return apps.play_plan(dev, "org.mozilla.fenix")
+
+
+def sc_install(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import apps
+    from tests.helpers import make_apk
+    make_apk(tmp / "keep.apk", "com.google.android.keep")
+    return apps.install_plan(dev, [tmp / "keep.apk"])
+
+
+def sc_folder(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import apps
+    from tests.helpers import make_apk
+    d = tmp / "apks"
+    d.mkdir()
+    make_apk(d / "base.apk", "com.example.one")
+    make_apk(d / "split_config.arm64_v8a.apk", "com.example.one")
+    make_apk(d / "two.apk", "com.example.two")
+    return apps.folder_plan(dev, d)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.apps.play_plan": sc_play,
+    "droidforge.features.apps.install_plan": sc_install,
+    "droidforge.features.apps.folder_plan": sc_folder,
     "droidforge.features.firewall.block_plan": sc_fw_block,
     "droidforge.features.firewall.unblock_plan": sc_fw_unblock,
     "droidforge.features.firewall.reapply_plan": sc_fw_reapply,

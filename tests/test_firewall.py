@@ -101,7 +101,7 @@ async def test_tui_asks_before_reapplying(df_home: Path) -> None:
     async with app.run_test(size=(140, 44)) as pilot:
         for _ in range(60):
             await pilot.pause(0.05)
-            if isinstance(app.screen, ConfirmBox):
+            if isinstance(app.screen, ConfirmBox) and app.screen.query("#no"):
                 break
         assert isinstance(app.screen, ConfirmBox)
         assert "com.heytap.browser" in str(app.screen.query_one("#confirm-body").render())

@@ -249,6 +249,8 @@ DOC_ONLY_ROWS: Dict[Row, str] = {
     (PR, "DNS hostnames"): "hostname data for the Private DNS rule",
     (WS, "QR payload"): "text encoded in the pairing QR code",
     (WS, "Shizuku APK"): "HTTPS download URL; the APK is installed via adb-install",
+    (AP, "Official APK sources (host HTTPS, only when the user asks)"): "HTTPS downloads on the host (urllib), "
+                                                                        "then adb-install",
     (RT, "Module dir"): "module layout built on the host",
     (RT, "Hide system app"): "module contents built on the host",
     (RT, "Firewall"): "iptables lines inside the module's service.sh",

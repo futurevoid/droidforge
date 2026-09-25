@@ -228,7 +228,8 @@ class FakePhone:
         """Comparable device state (for 'restored exactly' assertions)."""
         return {
             "packages": {n: (p.present, p.user0, p.enabled, p.suspended, tuple(sorted(p.perms.items())),
-                             tuple(sorted(p.appops.items())), p.locales) for n, p in self.packages.items()},
+                             tuple(sorted(p.appops.items())), p.locales) for n, p in self.packages.items()
+                         if p.present},
             "settings": copy.deepcopy(self.settings), "props": dict(self.props), "imes": dict(self.imes),
             "roles": copy.deepcopy(self.roles), "fw": (self.firewall_chain3, sorted(self.firewall_blocked)),
             "config": self.config.line(), "resolve": dict(self.resolve),
@@ -431,6 +432,8 @@ class SimBackend:
             return _ok()
         if args == ["wait-for-device"]:
             return _ok()
+        if args[0] in ("install", "install-multiple"):
+            return self._install([a for a in args[1:] if not a.startswith("-")])
         return self._unsupported("adb " + " ".join(args))
 
     def run_host(self, args: List[str], timeout: float = 600) -> RunResult:
@@ -439,6 +442,21 @@ class SimBackend:
         if args[:1] == ["adb"]:
             return self.run(args[1:], timeout)
         return _ok(f"sim: host command recorded: {' '.join(args)}")
+
+    def _install(self, paths: List[str]) -> RunResult:
+        from pathlib import Path
+
+        from droidforge.adb.apk import ApkError, package_name
+        try:
+            pkg = package_name(Path(paths[0]))
+        except (ApkError, OSError, IndexError):
+            return _fail("adb: failed to install: Failure [INSTALL_PARSE_FAILED_NOT_APK]", 1)
+        existing = self.phone.packages.get(pkg)
+        if existing is not None and existing.present:
+            existing.user0 = existing.enabled = True
+        else:
+            self.phone.add(pkg, system=False, perms={"android.permission.POST_NOTIFICATIONS": False})
+        return _ok("Performing Streamed Install\nSuccess")
 
     def _unsupported(self, cmd: str) -> RunResult:
         return R(EXIT_NOT_FOUND, "", f"sim: unsupported: {cmd}", 0)

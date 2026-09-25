@@ -77,3 +77,29 @@ UAD_SAMPLE = {
 WRITE_PREFIXES = ("pm disable", "pm enable", "pm suspend", "pm unsuspend", "pm uninstall", "pm grant", "pm revoke",
                   "cmd package install-existing", "settings put", "settings delete", "cmd appops set", "ime enable",
                   "ime disable", "ime set", "cmd locale set", "am force-stop", "cmd connectivity set", "cmd role add")
+
+
+def make_apk(path, package: str) -> None:
+    """A minimal APK (zip) whose binary AndroidManifest.xml declares `package` (for apk.py + the simulator)."""
+    import struct
+    import zipfile
+    strings = ["manifest", "package", package]
+    data = b""
+    offsets = []
+    for s in strings:
+        offsets.append(len(data))
+        b = s.encode()
+        data += bytes([len(s), len(b)]) + b + b"\x00"
+    while len(data) % 4:
+        data += b"\x00"
+    sp_hsize = 28
+    start = sp_hsize + 4 * len(strings)
+    sp = struct.pack("<HHIIIIII", 0x0001, sp_hsize, start + len(data), len(strings), 0, 1 << 8, start, 0)
+    sp += struct.pack(f"<{len(strings)}I", *offsets) + data
+    attr = struct.pack("<IIIHBBI", 0xFFFFFFFF, 1, 2, 8, 0, 0x03, 2)
+    el = struct.pack("<IIIIHHHHHH", 0, 0xFFFFFFFF, 0xFFFFFFFF, 0, 20, 20, 1, 0, 0, 0) + attr
+    el = struct.pack("<HHI", 0x0102, 16, 8 + len(el)) + el
+    body = sp + el
+    axml = struct.pack("<HHI", 0x0003, 8, 8 + len(body)) + body
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("AndroidManifest.xml", axml)
