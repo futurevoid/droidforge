@@ -36,6 +36,16 @@ ACTION_SETTINGS = "android.settings.SETTINGS"
 ACTION_PERMS = "android.intent.action.MANAGE_APP_PERMISSIONS"
 HOME = "HOME"
 
+CONNECTIVITY_HELP = """Connectivity service commands:
+  help
+    Print this help text.
+  airplane-mode [enable|disable]
+  set-chain3-enabled [true|false]
+    Enable or disable FIREWALL_CHAIN_OEM_DENY_3 for debugging.
+  get-package-networking-enabled [package name]
+  set-package-networking-enabled [true|false] [package name]
+    Set the deny bit in FIREWALL_CHAIN_OEM_DENY_3 to package."""
+
 SIGNERS = {"platform": "a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc",
            "oem": "c0105e2a9f0c7a1e8b3d4f5a6b7c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8",
            "google": "f0fd6c5b410f25cb25c3b53346c8972fae30f8ee7411df910480ad6b2d60db83",
@@ -116,6 +126,7 @@ class FakePhone:
         self.props: Dict[str, str] = {}
         self.imes: Dict[str, bool] = {}               # IME id -> enabled
         self.roles: Dict[str, List[str]] = {}
+        self.firewall_supported = True
         self.firewall_chain3 = False
         self.firewall_blocked: Set[str] = set()
         self.config = GlobalConfig()
@@ -452,6 +463,11 @@ class SimBackend:
         return _ok("\n".join(out))
 
     # ------------------------------------------------------------------ simple commands
+    def _c_su(self, t: List[str]) -> RunResult:
+        if self.phone.root is None:
+            return R(127, "", "/system/bin/sh: su: inaccessible or not found", 1)
+        raise Unsupported(" ".join(t))  # root commands are simulated in Phase 7
+
     def _c_echo(self, t: List[str]) -> RunResult:
         return _ok(" ".join(t[1:]))
 
@@ -599,6 +615,9 @@ class SimBackend:
             return self._locale(t[2:])
         if svc == "appops":
             return self._appops(t[2:])
+        if svc == "connectivity" and t[2:] == ["help"]:
+            return _ok(CONNECTIVITY_HELP if self.phone.firewall_supported else "Connectivity service commands:\n"
+                       "  help\n  airplane-mode [enable|disable]")
         if svc == "uimode" and t[2:] == ["night"]:
             return _ok(f"Night mode: {'yes' if self.phone.config.night else 'no'}")
         raise Unsupported(" ".join(t))

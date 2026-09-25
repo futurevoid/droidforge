@@ -61,7 +61,7 @@ the health gate is not done.
 - [x] **P1.8** `tests/test_invariants.py`: for every registered plan builder on the sim - every write step passes
   the guard, declares `touches`, has undo; execute -> diff shows only declared keys -> undo -> snapshot equals
   the original. Grows with each phase; a builder that is not registered fails the suite.
-- [ ] **P1.9** `features/doctor.py` (R-2.8): read-only report incl. health probes; on failure recommends Settings >
+- [x] **P1.9** `features/doctor.py` (R-2.8): read-only report incl. health probes; on failure recommends Settings >
   Reset all settings. Accept: `break_ui()` sim -> doctor prints the regressions and the advice, sends no writes.
 - [ ] **P1.10** (R-4.3, R-11.9) Expert mode + reboot check: `--expert` flag / TUI toggle with red banner; locked
   packages selectable only then, one per batch, typed name; reboot check waits for `sys.boot_completed`, re-runs
