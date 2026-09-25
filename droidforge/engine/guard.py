@@ -156,6 +156,7 @@ RULES: Tuple[Rule, ...] = (
     R("crash-buffer", r"logcat -b crash -d -t [0-9]{1,4}", ((HP, "Crashes"),)),
     R("pidof", rf"pidof {PKG}", ((HP, "Process alive"), (TO, "logcat (host stream)"))),
     R("connectivity-help", r"cmd connectivity help", ((FW, "Capability probe"),)),
+    R("fw-get", rf"cmd connectivity get-package-networking-enabled {PKG}", ((FW, "Read app block state"),)),
     R("role-get", rf"cmd role get-role-holders --user 0 {ROLES}|cmd role help", ((AP, "Role holders"),)),
     R("standby-get", rf"am get-standby-bucket {PKG}", ((AP, "Keep-alive"),)),
     R("appops-get", rf"cmd appops get {PKG}", ((AU, "App-ops"),)),
@@ -427,7 +428,7 @@ def check(step: object, device: Optional["Device"] = None) -> List[Verdict]:
         if extra:
             raise GuardError(u, f"undo touches more than its step declares: {', '.join(sorted(extra))}")
         verdicts.append(uv)
-    for fb in getattr(step, "fallbacks", []) or []:
+    for fb in list(getattr(step, "fallbacks", []) or []) + list(getattr(step, "extra", []) or []):
         verdicts += check(fb, device)
     return verdicts
 

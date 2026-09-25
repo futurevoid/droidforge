@@ -14,8 +14,9 @@ from droidforge.engine.plan import Plan, Step
 if TYPE_CHECKING:  # pragma: no cover
     from droidforge.adb.device import Device
 
-# a reboot restarts processes and bumps the ROM's own boot counter; nothing else may change
-REBOOT_TOUCHES = ["reboot", "setting:global:boot_count"]
+# a reboot restarts processes, bumps the ROM's own boot counter and clears the chain-3 firewall (platform
+# behaviour - droidforge offers to re-apply it on connect); nothing else may change
+REBOOT_TOUCHES = ["reboot", "setting:global:boot_count", "fw:*"]
 
 
 def reboot_plan(serial: str, title: str = "Reboot and re-check") -> Plan:

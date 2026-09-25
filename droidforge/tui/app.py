@@ -199,6 +199,7 @@ class DroidforgeApp(App[None]):
         current = self.query_one(ContentSwitcher).current or "dashboard"
         self.sections[current].refresh_from(self)
         self.check_startup()  # R-12.5: breakage between sessions is caught at every connect
+        self.check_firewall()  # R-5.5 / P14: rules cleared by a reboot -> ask, never re-apply on our own
 
     def refresh_bar(self, **fields: str) -> None:
         s = self.session
@@ -353,6 +354,23 @@ class DroidforgeApp(App[None]):
             return
         still = fix.Breakage(b.source, regs, [], b.recent, None, "Still not right after Fix it")
         self.show_breakage(still)
+
+    def check_firewall(self) -> None:
+        s = self.session
+        if s is None or not s.profile.firewall:
+            return
+        from droidforge.features import firewall
+
+        def ask(missing: List[str]) -> None:
+            if not missing:
+                return
+            body = ("These apps were blocked by droidforge, but their firewall rules are gone (the phone rebooted):\n"
+                    + "\n".join(f"  {p}" for p in missing) + "\n\nRe-apply the rules? You will see the plan first.")
+            self.push_screen(ConfirmBox("Firewall rules were cleared", body, "Re-apply", "Not now"),
+                             lambda yes: self.run_plan(lambda: firewall.reapply_plan(s.device, s.profile,
+                                                                                     expert_mode=self.expert))
+                             if yes else None)
+        self.background(lambda: firewall.missing_rules(s.device, s.profile), ask)
 
     def check_startup(self) -> None:
         s = self.session

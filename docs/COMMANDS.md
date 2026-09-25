@@ -83,6 +83,7 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | Block / unblock app | `cmd connectivity set-package-networking-enabled false <p>` / `... true <p>` | S (ShizuWall); Neo 8: V |
 | Disable chain | `cmd connectivity set-chain3-enabled false` | S |
 | Capability probe | `cmd connectivity help` contains `set-package-networking-enabled` | V |
+| Read app block state | `cmd connectivity get-package-networking-enabled <p>` -> `false` = blocked, `true` = allowed (used to detect rules lost at reboot, and as the verify of a block) | V |
 Rules are cleared on reboot (ShizuWall README). Re-apply on connect.
 
 ## Apps & defaults (R-6.x)

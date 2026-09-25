@@ -93,7 +93,8 @@ def test_protected_package_escalates_to_suspend(sim, phone: FakePhone) -> None:
 def test_suspend_refused_escalates_to_remove(sim, phone: FakePhone) -> None:
     p = "com.coloros.prome.service"           # ROM refuses disable-user and suspend
     plan = debloat.force_plan(sim, [p], UAD_SAMPLE)
-    assert [f.cmd for f in plan.steps[0].fallbacks] == [f"pm suspend --user 0 {p}", f"pm uninstall -k --user 0 {p}"]
+    assert [f.cmd for f in plan.steps[0].fallbacks] == [f"pm suspend --user 0 {p}", f"pm uninstall -k --user 0 {p}",
+                                                        f"cmd connectivity set-package-networking-enabled false {p}"]
     assert any("disable -> suspend" in n for n in plan.notes)
     h = History(phone.serial)
     rep = executor.run(plan, sim, yes, history=h)
@@ -106,6 +107,7 @@ def test_suspend_refused_escalates_to_remove(sim, phone: FakePhone) -> None:
 def test_everything_refused_suggests_neuter(sim, phone: FakePhone) -> None:
     p = "com.opos.cs"
     phone.packages[p].refuse = {"disable", "suspend", "uninstall"}
+    phone.firewall_supported = False           # no chain-3 firewall on this build: no fourth stage
     rep = executor.run(debloat.force_plan(sim, [p], UAD_SAMPLE), sim, yes)
     assert not rep.results[0].ok and rep.results[0].applied == []
     assert debloat.protected_by_rom(rep.results) == [f"{p} is protected by the ROM itself. Neuter can still silence it."]

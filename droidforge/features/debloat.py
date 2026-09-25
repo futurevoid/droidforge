@@ -199,11 +199,13 @@ def remove_plan(device: "Device", pkgs: Iterable[str], uad: Optional[Uad] = None
     return _finish(prep)
 
 
-def force_step(p: str, risk: str = "normal") -> Step:
-    """R-4.2 escalation chain for one package: disable -> suspend -> remove for user 0."""
+def force_step(p: str, risk: str = "normal", last: Optional[Step] = None) -> Step:
+    """R-4.2 escalation chain for one package: disable -> suspend -> remove for user 0 [-> firewall + neuter]."""
     s = steps.disable(p, risk=risk)
     s.label = f"Force-disable {p}"
     s.fallbacks = [steps.suspend(p, risk=risk), steps.remove_user0(p, risk=risk)]
+    if last is not None:
+        s.fallbacks.append(last)
     return s
 
 
@@ -211,15 +213,22 @@ def force_plan(device: "Device", pkgs: Iterable[str], uad: Optional[Uad] = None,
     u = _uad(uad)
     prep = _prepare(device, pkgs, "Force-disable packages", u, expert_mode)
     disabled = device.packages("-d")
+    from droidforge.features import firewall
+    fw = firewall.supported(device)
     for p in prep.allowed:
         if p in disabled:
             prep.plan.notes.append(f"Already disabled: {p}")
             continue
-        prep.plan.steps.append(_with_ime_touches(force_step(p, _risk(p, prep)), prep))
+        r = _risk(p, prep)
+        last = firewall.last_stage(device, p, neuter_steps(device, p, r), r) if fw else None
+        prep.plan.steps.append(_with_ime_touches(force_step(p, r, last), prep))
     if prep.plan.steps:
         prep.plan.notes.append("Escalation, stage by stage with the health check in between: disable -> suspend "
-                               "(frozen: cannot open or run) -> remove for user 0. Undo reverses whichever stage "
-                               "took effect.")
+                               "(frozen: cannot open or run) -> remove for user 0"
+                               + (" -> block its internet + neuter it" if fw else "")
+                               + ". Undo reverses whichever stage took effect.")
+        if fw:
+            prep.plan.notes.append(firewall.REBOOT_NOTE)
     return _finish(prep)
 
 

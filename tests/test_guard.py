@@ -87,6 +87,7 @@ EXAMPLES: Dict[str, str] = {
     "crash-buffer": "logcat -b crash -d -t 200",
     "pidof": "pidof com.android.systemui",
     "connectivity-help": "cmd connectivity help",
+    "fw-get": "cmd connectivity get-package-networking-enabled com.heytap.market",
     "role-get": "cmd role get-role-holders --user 0 android.app.role.SMS",
     "standby-get": "am get-standby-bucket com.whatsapp",
     "dumpsys-packages": "dumpsys package packages",

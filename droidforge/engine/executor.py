@@ -34,7 +34,8 @@ if TYPE_CHECKING:  # pragma: no cover
 ERR_RE = re.compile(r"(?i)\b(error|exception|failure|unknown package|not installed)\b")
 BOOT_POLL_S = 2.0
 BOOT_FAIL = "the phone did not come back after the reboot"
-OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:")
+OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:", "fw:")
+UNOBSERVABLE = ("fw:chain3",)   # no getter for the chain switch
 
 ConfirmHook = Callable[[Plan], Union[bool, Confirmation]]
 
@@ -278,6 +279,17 @@ def _run_step(step: Step, device: "Device", declared: List[str], gate: Callable[
             if not res.ok:
                 res.err = BOOT_FAIL
                 return res
+            for ex in stage.extra:   # companions of a compound stage (e.g. firewall + neuter)
+                declared.extend(ex.all_touches())
+                try:
+                    er = _send(ex, device)
+                except guard.GuardError as e:
+                    er = RunResult(1, "", str(e))
+                res.attempts.append(ex.cmd)
+                if succeeded(er):
+                    res.applied.append(ex)
+                else:
+                    device.log.warn(f"{ex.label} -> {er.err or er.out or 'failed'}")
             if stage.verify:
                 v = device.read(stage.verify)
                 res.verified = bool(re.search(stage.expect, v.out)) if stage.expect else v.ok
@@ -293,7 +305,7 @@ def _effects(results: Sequence[StepResult], changes: Sequence[Change]) -> None:
         if r.dry_run or not r.applied:
             continue
         touches = [t for st in r.applied for t in st.touches]
-        observable = [t for t in touches if t.startswith(OBSERVABLE)]
+        observable = [t for t in touches if t.startswith(OBSERVABLE) and t not in UNOBSERVABLE]
         if not observable:
             r.effect = "unknown"
         elif any(snapshot.covered(k, observable) for k in keys):

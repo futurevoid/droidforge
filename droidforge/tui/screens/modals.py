@@ -62,7 +62,7 @@ class ConfirmBox(ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label(f"[b]{self.title_text}[/b]")
-            yield Static(self.body, markup=False)
+            yield Static(self.body, markup=False, id="confirm-body")
             with Horizontal():
                 yield Button(self.yes, id="yes", variant="error")
                 yield Button(self.no, id="no", variant="primary")

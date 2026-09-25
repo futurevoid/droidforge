@@ -21,9 +21,8 @@ from tests.helpers import (
 
 
 def writes_in(phone: FakePhone, start: int = 0) -> List[str]:
-    reads = ("getprop", "pm list", "settings get", "settings list", "dumpsys", "cmd package resolve", "ime list",
-             "cmd locale get", "cmd appops get", "cmd uimode night", "logcat", "pidof", "for p in")
-    return [c for c in phone.log[start:] if not c.startswith(reads)]
+    from tests.helpers import WRITE_PREFIXES
+    return [c for c in phone.log[start:] if c.startswith(WRITE_PREFIXES)]
 
 
 # ---------------------------------------------------------------- (a) dry-run

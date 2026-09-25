@@ -76,6 +76,7 @@ class Device:
         self.read_guard = read_guard
         self.write_guard = write_guard
         self._props: Dict[str, str] = {}
+        self.caps: Dict[str, bool] = {}   # capability probes (firewall, ...), cached for the session
         self._plist: Dict[str, Set[str]] = {}
 
     # ------------------------------------------------------------------ transport

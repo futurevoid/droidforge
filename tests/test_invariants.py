@@ -284,7 +284,35 @@ def sc_install_hijack(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return privacy.install_hijack_plan(dev, UAD_SAMPLE, lower_verification=True)
 
 
+def sc_fw_block(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import firewall
+    return firewall.block_plan(dev, ["com.heytap.browser", "com.whatsapp"])
+
+
+def sc_fw_unblock(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import firewall
+    phone.firewall_chain3 = True
+    phone.firewall_blocked |= {"com.heytap.browser"}
+    return firewall.unblock_plan(dev, ["com.heytap.browser", "com.whatsapp"])
+
+
+def sc_fw_reapply(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import firewall
+    return firewall.reapply_plan(dev, Profile(firewall=["com.heytap.browser", "com.not.installed"]))
+
+
+def sc_force_last_stage(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import debloat
+    from tests.helpers import UAD_SAMPLE
+    phone.packages["com.heytap.market"].refuse = {"disable", "suspend", "uninstall"}
+    return debloat.force_plan(dev, ["com.heytap.market"], UAD_SAMPLE)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.firewall.block_plan": sc_fw_block,
+    "droidforge.features.firewall.unblock_plan": sc_fw_unblock,
+    "droidforge.features.firewall.reapply_plan": sc_fw_reapply,
+    "droidforge.features.debloat.force_plan#last-stage": sc_force_last_stage,
     "droidforge.features.privacy.install_hijack_plan": sc_install_hijack,
     "droidforge.features.dns.dns_plan": sc_dns,
     "droidforge.features.privacy.telemetry_plan": sc_telemetry,
@@ -325,9 +353,10 @@ SCENARIOS: Dict[str, Scenario] = {
 # ---------------------------------------------------------------------- tests
 def test_every_plan_builder_is_registered() -> None:
     found = discover_builders()
-    missing = found - set(SCENARIOS)
+    registered = {k.split("#")[0] for k in SCENARIOS}
+    missing = found - registered
     assert not missing, f"plan builders not registered in tests/test_invariants.py: {sorted(missing)}"
-    stale = set(SCENARIOS) - found
+    stale = registered - found
     assert not stale, f"registered builders that no longer exist: {sorted(stale)}"
 
 

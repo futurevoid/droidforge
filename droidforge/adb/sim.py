@@ -193,6 +193,8 @@ class FakePhone:
         `sys.boot_completed` reads empty for a few polls (the executor must wait for it)."""
         self.boots += 1
         self.crashes = []
+        self.firewall_chain3 = False          # platform behaviour: chain-3 rules are cleared at reboot
+        self.firewall_blocked = set()
         for p in self.packages.values():
             p.running = p.name in ("android", "com.android.systemui", "com.android.settings", "com.android.launcher")
         g = self.settings["global"]
@@ -657,12 +659,34 @@ class SimBackend:
             return self._locale(t[2:])
         if svc == "appops":
             return self._appops(t[2:])
-        if svc == "connectivity" and t[2:] == ["help"]:
-            return _ok(CONNECTIVITY_HELP if self.phone.firewall_supported else "Connectivity service commands:\n"
-                       "  help\n  airplane-mode [enable|disable]")
+        if svc == "connectivity":
+            return self._connectivity(t[2:])
         if svc == "uimode" and t[2:] == ["night"]:
             return _ok(f"Night mode: {'yes' if self.phone.config.night else 'no'}")
         raise Unsupported(" ".join(t))
+
+    def _connectivity(self, a: List[str]) -> RunResult:
+        ph = self.phone
+        if a == ["help"]:
+            return _ok(CONNECTIVITY_HELP if ph.firewall_supported else "Connectivity service commands:\n"
+                       "  help\n  airplane-mode [enable|disable]")
+        if not ph.firewall_supported:
+            return _fail(f"Unknown command: {a[0]}", 255)
+        if a[0] == "set-chain3-enabled" and a[1:] in (["true"], ["false"]):
+            ph.firewall_chain3 = a[1] == "true"
+            return _ok()
+        if a[0] in ("set-package-networking-enabled", "get-package-networking-enabled"):
+            pkg = a[-1]
+            if self._pkg(pkg) is None:
+                return _fail(f"java.lang.IllegalArgumentException: No package {pkg}", 255)
+            if a[0].startswith("get"):
+                return _ok("false" if pkg in ph.firewall_blocked else "true")
+            if a[1] == "false":
+                ph.firewall_blocked.add(pkg)
+            else:
+                ph.firewall_blocked.discard(pkg)
+            return _ok()
+        raise Unsupported(" ".join(a))
 
     def _resolve(self, a: List[str]) -> RunResult:
         action = a[a.index("-a") + 1] if "-a" in a else ""

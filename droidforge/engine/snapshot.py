@@ -64,6 +64,8 @@ class Snapshot:
                 f[f"perm:{p}:{perm}"] = "granted" if granted else "denied"
             for op, mode in d.get("appops", {}).items():
                 f[f"appop:{p}:{op}"] = mode
+            if "fw" in d:
+                f[f"fw:{p}"] = d["fw"]
         for p, loc in self.app_locales.items():
             f[f"applocale:{p}"] = loc
         for i in self.imes:
@@ -102,6 +104,14 @@ class Change:
                f"{self.after if self.after is not None else '-'}"
 
 
+def firewall_supported(device: "Device") -> bool:
+    """Chain-3 firewall available on this build (`cmd connectivity help`), cached per device."""
+    caps = device.caps
+    if "firewall" not in caps:
+        caps["firewall"] = "set-package-networking-enabled" in device.read("cmd connectivity help").out
+    return caps["firewall"]
+
+
 # ---------------------------------------------------------------------- take
 def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Snapshot:
     """Read-only snapshot. `scope` = packages whose suspension / permissions / app-ops are recorded
@@ -116,12 +126,17 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
     installed = device.packages()
     disabled = device.packages("-d")
     s.packages = {p: {"installed": p in installed, "enabled": p not in disabled} for p in sorted(present)}
+    fw = firewall_supported(device) if scope else False
     for p in scope:
         if p not in present:
             continue
         dump = device.read(f"dumpsys package {p}").out
         s.details[p] = {"suspended": parse.suspended(dump), "perms": parse.runtime_perms(dump),
                         "appops": parse.appops(device.read(f"cmd appops get {p}").out)}
+        if fw:
+            v = device.out(f"cmd connectivity get-package-networking-enabled {p}")
+            if v in ("true", "false"):
+                s.details[p]["fw"] = "allowed" if v == "true" else "blocked"
     if device.sdk >= 33:
         targets = sorted(installed) if full else sorted((device.packages("-3") | set(scope)) & installed)
         res = batch_read(device, targets, "cmd locale get-app-locales $p --user 0", label="app locales")
@@ -141,7 +156,7 @@ def diff(before: Snapshot, after: Snapshot) -> List[Change]:
     both = set(before.details) & set(after.details)
     changes = []
     for k in sorted(set(a) | set(b)):
-        if k.startswith(("perm:", "appop:")) or k.endswith(":suspended"):
+        if k.startswith(("perm:", "appop:", "fw:")) or k.endswith(":suspended"):
             if k.split(":")[1] not in both:
                 continue
         if k.startswith("applocale:") and (k not in a or k not in b):

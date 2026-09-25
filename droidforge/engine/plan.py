@@ -10,7 +10,7 @@ from typing import List, Optional
 RISKS = ("read", "normal", "risky", "locked")
 BATCH_SIZE = 5  # P13
 # Touches that leave nothing to undo: a stopped process restarts, a reboot bumps the ROM's own boot counter.
-EPHEMERAL_TOUCHES = ("proc:", "reboot", "setting:global:boot_count")
+EPHEMERAL_TOUCHES = ("proc:", "reboot", "setting:global:boot_count", "fw:*")
 
 
 def is_ephemeral(touch: str) -> bool:
@@ -31,16 +31,21 @@ class Step:
     host: bool = False               # run on the PC instead of the phone
     touches: List[str] = field(default_factory=list)       # declared blast radius (P10)
     undoes: Optional[str] = None     # history entry id this step reverts (history marks it undone)
+    extra: List["Step"] = field(default_factory=list)       # companions run after this step succeeds (compound stage)
 
     def all_undo(self) -> List[str]:
-        """Undo of this step and every fallback stage, in the order they would be applied."""
+        """Undo of this step, its companions and every fallback stage, in the order they would be applied."""
         out = list(self.undo)
+        for ex in self.extra:
+            out += ex.all_undo()
         for fb in self.fallbacks:
             out += fb.all_undo()
         return out
 
     def all_touches(self) -> List[str]:
         out = list(self.touches)
+        for ex in self.extra:
+            out += ex.all_touches()
         for fb in self.fallbacks:
             out += fb.all_touches()
         return out

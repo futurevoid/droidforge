@@ -45,6 +45,10 @@ def step_text(i: int, s: Step) -> Text:
         t.append(f"      stage {n} if refused: {fb.cmd}\n", style="yellow")
         for u in fb.undo:
             t.append(f"        undo: {u}\n", style="green")
+        for ex in fb.extra:
+            t.append(f"        + {ex.cmd}\n", style="yellow")
+            for u in ex.undo:
+                t.append(f"          undo: {u}\n", style="green")
     return t
 
 
