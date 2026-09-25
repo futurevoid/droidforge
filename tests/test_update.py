@@ -40,6 +40,8 @@ def _opener(answers: dict):
 def test_versions() -> None:
     assert update.parse_version("v1.10.0") > update.parse_version("v1.9.3")
     assert update.parse_version("junk") == ()
+    assert update.parse_version("DroidForge-v1.0.1") == (1, 0, 1) and update.parse_version("DroidForge-v1") == (1, 0, 0)
+    assert update.is_newer("DroidForge-v1.0.2", "1.0.1") and not update.is_newer("DroidForge-v1", "1.0.0")
     assert update.is_newer("v9.0.0") and not update.is_newer("v0.0.1")
 
 

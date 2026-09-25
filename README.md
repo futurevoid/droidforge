@@ -9,7 +9,7 @@ without root.
 - Audit (permissions, signers, live connections), tools (scrcpy, logcat, activity launcher, shell), wireless pairing + Shizuku
 - Every action previewed with exact commands, recorded in an undoable history timeline; HTML session report; `--simulate` fake phone
 
-Status: **v1.0.0** (Phases 0-6 and 8 of `docs/PLAN.md`). Root mode (Magisk / KernelSU / APatch) is planned for v2.
+Status: **v1.0.x** (Phases 0-6 and 8 of `docs/PLAN.md`). Root mode (Magisk / KernelSU / APatch) is planned for v2.
 Real-device validation (Phase 9, `docs/DEVICE_CHECKLIST.md`) runs after v1 - read "Before your first real run".
 
 License: GPL-3.0-or-later. Debloat ratings from
