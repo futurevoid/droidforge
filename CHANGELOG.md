@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-09-25
 
 - App names next to package names (plan preview, debloat list, keep-alive / firewall pickers, CLI keep-alive
   picker): read from each app's own APK (English first), cached per APK version, so the right app is picked.
