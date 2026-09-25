@@ -242,7 +242,7 @@ def wait_for_boot(device: "Device", sleep: Callable[[float], None] = time.sleep,
     run_host(wait, device, timeout=timeout)
     device.forget_props()
     device.invalidate("reboot")
-    for _ in range(max(1, int(timeout / BOOT_POLL_S))):
+    for _ in range(max(1, int(timeout / max(BOOT_POLL_S, 0.1)))):
         if device.read("getprop sys.boot_completed").out.strip() == "1":
             device.log.ok("Phone finished booting")
             return True

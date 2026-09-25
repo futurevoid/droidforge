@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, OptionList, Static
 
@@ -39,6 +39,36 @@ class MessageBox(ModalScreen[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(None)
+
+
+EXPERT_WARNING = ("Expert mode lets you select locked packages: SystemUI, telephony, Play services, WebView, UI "
+                  "infrastructure, the current keyboard and launcher, UAD Unsafe. Breaking these can mean no calls, "
+                  "no keyboard, no home screen or a boot loop.\n\nEach locked package runs alone, you type its full "
+                  "name, the health check runs after it, and a reboot check is offered afterwards.")
+
+
+class ConfirmBox(ModalScreen[bool]):
+    DEFAULT_CSS = """
+    ConfirmBox { align: center middle; }
+    ConfirmBox > Vertical { width: 80%; max-width: 100; height: auto; border: thick $error; padding: 1 2;
+                            background: $surface; }
+    ConfirmBox Horizontal { height: 3; }
+    """
+
+    def __init__(self, title: str, body: str, yes: str = "Yes", no: str = "No") -> None:
+        super().__init__()
+        self.title_text, self.body, self.yes, self.no = title, body, yes, no
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(f"[b]{self.title_text}[/b]")
+            yield Static(self.body)
+            with Horizontal():
+                yield Button(self.yes, id="yes", variant="error")
+                yield Button(self.no, id="no", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "yes")
 
 
 class LimitsNote(MessageBox):

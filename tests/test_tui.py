@@ -207,3 +207,178 @@ async def test_history_table(df_home: Path) -> None:
         ht.load(h.entries())
         await pilot.pause()
         assert ht.row_count == 2 and ht.current_id() == h.entries()[-1].id
+
+
+# ---------------------------------------------------------------- P3.3 sections
+import json  # noqa: E402
+
+from droidforge.adb.sim import IME_GBOARD, neo8_cn  # noqa: E402
+
+
+async def settle(app: DroidforgeApp, pilot, t: float = 0.2) -> None:
+    await pilot.pause(t)
+    await app.workers.wait_for_complete()
+    await pilot.pause()
+
+
+async def run_previewed(app: DroidforgeApp, pilot) -> None:
+    for _ in range(50):
+        await pilot.pause(0.05)
+        if isinstance(app.screen, PlanPreview):
+            break
+    assert isinstance(app.screen, PlanPreview), f"no preview, screen is {app.screen!r}"
+    app.screen.query_one("#run").press()
+    await settle(app, pilot)
+
+
+def press(app: DroidforgeApp, selector: str) -> None:
+    app.query_one(selector).press()
+
+
+def write_uad_cache(df_home: Path) -> None:
+    from droidforge.data import uad
+    uad.cache_file().write_text(json.dumps(UAD_SAMPLE))
+
+
+async def test_every_section_runs_one_action(df_home: Path) -> None:
+    write_uad_cache(df_home)
+    phone = neo8_cn()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        # dashboard: doctor
+        report = str(app.query_one("#doctor-report").render())
+        assert "Everything droidforge checks looks healthy." in report
+
+        # language: open Settings > Language, then per-app language for a picked user app
+        app.show_section("language")
+        await settle(app, pilot)
+        assert "Chinese is first" in str(app.query_one("#lang-status").render())
+        press(app, "#open-lang")
+        await run_previewed(app, pilot)
+        assert "android.settings.LOCALE_SETTINGS" in phone.started
+        app.query_one("#apps").select("com.whatsapp")
+        app.query_one("#locales").value = "en-US,ar-EG"
+        press(app, "#set-apps")
+        await run_previewed(app, pilot)
+        assert phone.packages["com.whatsapp"].locales == "en-US,ar-EG"
+
+        # keyboard: Gboard
+        app.show_section("keyboard")
+        await settle(app, pilot)
+        press(app, "#gboard")
+        await run_previewed(app, pilot)
+        assert phone.settings["secure"]["default_input_method"] == IME_GBOARD
+        assert app.last_report.offer_reboot
+
+        # dashboard: reboot check after the risky keyboard plan
+        app.show_section("dashboard")
+        await settle(app, pilot)
+        app.sleep = lambda _: None
+        press(app, "#reboot-check")
+        await run_previewed(app, pilot)
+        assert phone.boots == 1 and app.last_report.status == "done"
+
+        # debloat: load, pick, disable
+        app.show_section("debloat")
+        await settle(app, pilot)
+        table = app.query_one(PackageTable)
+        assert "com.heytap.market" in [r.pkg for r in table.rows]
+        table.toggle("com.heytap.market")
+        press(app, "#act-disable")
+        await run_previewed(app, pilot)
+        assert not phone.packages["com.heytap.market"].enabled
+
+        # history: undo the newest entry (the disable)
+        app.show_section("history")
+        await settle(app, pilot)
+        ht = app.query_one(HistoryTable)
+        assert ht.current_id() == app.session.history.entries()[-1].id
+        press(app, "#undo")
+        await run_previewed(app, pilot)
+        assert phone.packages["com.heytap.market"].enabled
+
+
+async def test_guide_watcher_offers_caught_apps(df_home: Path) -> None:
+    phone = neo8_cn()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        app.show_section("language")
+        await settle(app, pilot)
+        press(app, "#guide-3")
+        phone.focused = "com.tencent.mm"
+        await pilot.pause(1.0)
+        await settle(app, pilot)
+        phone.focused = "com.android.settings"
+        await pilot.pause(1.0)
+        await settle(app, pilot)
+        assert "com.tencent.mm" in str(app.query_one("#caught").render())
+        press(app, "#guide-3-stop")
+        await run_previewed(app, pilot)
+        assert phone.packages["com.tencent.mm"].locales == "en-US"
+
+
+async def test_expert_toggle_asks_first(df_home: Path) -> None:
+    from droidforge.tui.screens.modals import ConfirmBox
+    app = DroidforgeApp(simulate=True, show_limits=False)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+e")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmBox)
+        app.screen.query_one("#yes").press()
+        await pilot.pause()
+        assert app.expert and app.session.expert
+        assert not app.query_one(ExpertBanner).has_class("hidden")
+        await pilot.press("ctrl+e")
+        await pilot.pause()
+        assert not app.expert and app.query_one(ExpertBanner).has_class("hidden")
+
+
+async def test_unexpected_error_is_shown_not_fatal(df_home: Path, monkeypatch) -> None:
+    from droidforge.tui.screens.modals import MessageBox
+
+    def boom(*a, **kw):
+        raise RuntimeError("device vanished")
+    app = DroidforgeApp(simulate=True, show_limits=False)
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        monkeypatch.setattr("droidforge.tui.app.executor.run", boom)
+        app.run_plan(Plan("x", debloat.disable_plan(app.session.device, ["com.heytap.market"], UAD_SAMPLE).steps))
+        await settle(app, pilot)
+        assert isinstance(app.screen, MessageBox) and "device vanished" in str(app.screen.query_one("#body").render())
+        assert app.is_running
+
+
+async def test_quit_with_open_preview_cancels_and_exits(df_home: Path) -> None:
+    phone = neo8_cn()
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    before = None
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        before = phone.state()
+        app.run_plan(debloat.disable_plan(app.session.device, ["com.heytap.market"], UAD_SAMPLE))
+        await pilot.pause(0.3)
+        assert isinstance(app.screen, PlanPreview)
+    # leaving the context exits the app while the preview is open: no hang, nothing sent
+    assert phone.state() == before
+
+
+async def test_selected_marker_is_visible(df_home: Path) -> None:
+    from textual.app import App
+
+    from droidforge.adb.sim import sim_device
+    from droidforge.log import Logger
+
+    class T(App[None]):
+        def compose(self):
+            yield PackageTable(id="pt")
+    app = T()
+    async with app.run_test(size=SIZE) as pilot:
+        pt = app.query_one(PackageTable)
+        pt.load(debloat.scan(sim_device(log=Logger(1)), UAD_SAMPLE, "market"))
+        pt.toggle("com.heytap.market")
+        await pilot.pause()
+        cell = pt.query_one("#pkg-table").get_cell_at((0, 0))
+        assert str(cell) == "[x]"

@@ -7,13 +7,14 @@ Engine calls run in thread workers; log lines reach the LogPane through a thread
 from __future__ import annotations
 
 import threading
-from typing import Callable, Dict, List, Optional, Tuple
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
-from textual.widgets import ContentSwitcher, Footer, Label, ListItem, ListView, Static
+from textual.containers import Horizontal
+from textual.widgets import ContentSwitcher, Footer, Label, ListItem, ListView
 
 from droidforge import config
 from droidforge.adb.device import list_devices
@@ -24,7 +25,14 @@ from droidforge.engine.executor import RunReport
 from droidforge.engine.plan import Confirmation, Plan
 from droidforge.log import LOG
 from droidforge.session import ConnectError, Session, open_session
-from droidforge.tui.screens.modals import DevicePicker, LimitsNote, MessageBox
+from droidforge.features.doctor import DoctorReport
+from droidforge.tui.screens.base import Section
+from droidforge.tui.screens.dashboard import DashboardSection
+from droidforge.tui.screens.debloat import DebloatSection
+from droidforge.tui.screens.history import HistorySection
+from droidforge.tui.screens.keyboard import KeyboardSection
+from droidforge.tui.screens.language import LanguageSection
+from droidforge.tui.screens.modals import EXPERT_WARNING, ConfirmBox, DevicePicker, LimitsNote, MessageBox
 from droidforge.tui.widgets.device_bar import DeviceBar, ExpertBanner
 from droidforge.tui.widgets.log_pane import LogPane
 from droidforge.tui.widgets.plan_preview import PlanPreview
@@ -40,21 +48,8 @@ SECTIONS: List[Tuple[str, str]] = [
 ]
 
 
-class Section(VerticalScroll):
-    """A main-area section. Screens for the features replace the placeholder body."""
-
-    DEFAULT_CSS = "Section { padding: 1 2; }"
-
-    def __init__(self, section_id: str, title: str) -> None:
-        super().__init__(id=section_id)
-        self.title_text = title
-
-    def compose(self) -> ComposeResult:
-        yield Label(f"[b]{self.title_text}[/b]")
-        yield Static("", classes="body")
-
-    def refresh_from(self, app: "DroidforgeApp") -> None:  # overridden by feature sections
-        pass
+SECTION_CLASSES = {"dashboard": DashboardSection, "language": LanguageSection, "keyboard": KeyboardSection,
+                   "debloat": DebloatSection, "history": HistorySection}
 
 
 class DroidforgeApp(App[None]):
@@ -67,6 +62,7 @@ class DroidforgeApp(App[None]):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("l", "toggle_log", "Log pane"),
+        Binding("ctrl+e", "toggle_expert", "Expert mode"),
     ]
 
     def __init__(self, simulate: bool = False, serial: Optional[str] = None, expert: bool = False,
@@ -80,6 +76,8 @@ class DroidforgeApp(App[None]):
         self.sections: Dict[str, Section] = {}
         self.status_text = "connecting..."
         self.last_report: Optional[RunReport] = None
+        self.sleep: Callable[[float], None] = time.sleep   # tests replace it (reboot check polling)
+        self._pending: List[Tuple[threading.Event, Dict[str, Confirmation]]] = []
 
     # ------------------------------------------------------------------ layout
     def compose(self) -> ComposeResult:
@@ -99,7 +97,7 @@ class DroidforgeApp(App[None]):
         yield Footer()
 
     def make_section(self, sid: str, label: str) -> Section:
-        return Section(sid, label)
+        return SECTION_CLASSES.get(sid, Section)(sid, label)
 
     def on_mount(self) -> None:
         pane = self.query_one(LogPane)
@@ -111,6 +109,7 @@ class DroidforgeApp(App[None]):
         self.connect(self.serial)
 
     def on_unmount(self) -> None:
+        self._release_pending()
         LOG.remove_sink(self._sink)
 
     # ------------------------------------------------------------------ navigation
@@ -125,6 +124,22 @@ class DroidforgeApp(App[None]):
 
     def action_toggle_log(self) -> None:
         self.query_one(LogPane).toggle_class("hidden")
+
+    def action_toggle_expert(self) -> None:
+        """R-4.3: expert mode toggle in the header; red banner while on. Turning it on asks first."""
+        if self.expert:
+            self.set_expert(False)
+            return
+        self.push_screen(ConfirmBox("Turn on expert mode?", EXPERT_WARNING),
+                         lambda yes: self.set_expert(True) if yes else None)
+
+    def set_expert(self, on: bool) -> None:
+        self.expert = on
+        if self.session is not None:
+            self.session.expert = on
+        self.query_one(ExpertBanner).set_class(not on, "hidden")
+        self.refresh_bar()
+        LOG.warn("Expert mode ON" if on else "Expert mode off")
 
     # ------------------------------------------------------------------ connection
     @work(thread=True, exclusive=True, group="connect")
@@ -168,37 +183,91 @@ class DroidforgeApp(App[None]):
             dry_run="DRY-RUN" if self.dry_run else "", expert="EXPERT" if self.expert else "", **fields)
 
     # ------------------------------------------------------------------ plans
-    def run_plan(self, plan: Plan, on_done: Optional[PlanDone] = None) -> None:
-        """Preview -> confirm -> execute in a worker. Plans without steps only show their notes."""
+    def run_plan(self, plan: Union[Plan, Callable[[], Plan]], on_done: Optional[PlanDone] = None) -> None:
+        """Build (in the worker: builders read the phone) -> preview -> confirm -> execute.
+        Plans without steps only show their notes."""
         if self.session is None:
             self.notify("No phone connected", severity="error")
-            return
-        if not plan.steps:
-            self.push_screen(MessageBox(plan.title, "\n".join(plan.notes) or "Nothing to do."))
             return
         self._plan_worker(plan, on_done)
 
     @work(thread=True, exclusive=True, group="plan")
-    def _plan_worker(self, plan: Plan, on_done: Optional[PlanDone]) -> None:
+    def _plan_worker(self, plan: Union[Plan, Callable[[], Plan]], on_done: Optional[PlanDone]) -> None:
         s = self.session
         assert s is not None
-        rep = executor.run(plan, s.device, self.confirm_blocking, dry_run=self.dry_run, history=s.history,
-                           profile=s.profile, expert_mode=self.expert)
+        try:
+            built = plan() if callable(plan) else plan
+        except Exception as e:  # a builder that cannot read what it needs: show it, never crash the app
+            LOG.error(f"could not build the plan: {e}")
+            self.call_from_thread(self.message, "Could not build the plan", str(e))
+            return
+        if not built.steps:
+            self.call_from_thread(self.message, built.title, "\n".join(built.notes) or "Nothing to do.")
+            return
+        try:
+            rep = executor.run(built, s.device, self.confirm_blocking, dry_run=self.dry_run, history=s.history,
+                               profile=s.profile, expert_mode=self.expert)
+        except Exception as e:
+            self.call_from_thread(self._crashed, built, e)
+            return
         self.call_from_thread(self._plan_finished, rep, on_done)
+
+    def _crashed(self, plan: Plan, e: Exception) -> None:
+        """Never let an unexpected error take the app down mid-plan: say what happened and where recovery is."""
+        import traceback
+        LOG.dbg("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+        LOG.error(f"Unexpected error while running '{plan.title}': {e}")
+        body = f"{type(e).__name__}: {e}\n\nFull traceback in the debug log."
+        if plan.recovery:
+            body += f"\n\nRecovery script (undo of this plan): {plan.recovery}\nRun it with: sh {plan.recovery}"
+        self.push_screen(MessageBox("Unexpected error", body))
+
+    def message(self, title: str, body: str) -> None:
+        """Show a message box. UI thread only: widgets must be built there (workers use call_from_thread)."""
+        self.push_screen(MessageBox(title, body))
+
+    def background(self, fn: Callable[[], Any], done: Callable[[Any], None]) -> None:
+        """Run a read-only engine call in a thread; `done(result)` on the UI thread."""
+        self._bg_worker(fn, done)
+
+    @work(thread=True, group="read")
+    def _bg_worker(self, fn: Callable[[], Any], done: Callable[[Any], None]) -> None:
+        try:
+            res = fn()
+        except Exception as e:
+            LOG.error(f"read failed: {e}")
+            return
+        self.call_from_thread(done, res)
 
     def confirm_blocking(self, plan: Plan) -> Confirmation:
         """The executor's confirm hook (runs in the worker thread): block until the preview is dismissed."""
         done = threading.Event()
         box: Dict[str, Confirmation] = {}
+        self._pending.append((done, box))
 
         def show() -> None:
             def result(r: Optional[Confirmation]) -> None:
-                box["r"] = r or Confirmation(False)
+                box.setdefault("r", r or Confirmation(False))
                 done.set()
             self.push_screen(PlanPreview(plan, dry_run=self.dry_run), result)
-        self.call_from_thread(show)
+        try:
+            self.call_from_thread(show)
+        except RuntimeError:  # the app is shutting down
+            box.setdefault("r", Confirmation(False))
+            done.set()
         done.wait()
+        self._pending.remove((done, box))
         return box["r"]
+
+    def _release_pending(self) -> None:
+        """On exit, every open confirmation answers Cancel - nothing is sent, the worker ends."""
+        for done, box in list(self._pending):
+            box.setdefault("r", Confirmation(False))
+            done.set()
+
+    async def action_quit(self) -> None:
+        self._release_pending()
+        await super().action_quit()
 
     def _plan_finished(self, rep: RunReport, on_done: Optional[PlanDone]) -> None:
         self.last_report = rep
@@ -220,3 +289,27 @@ class DroidforgeApp(App[None]):
         """Replaced by the breakage alert (P3.5)."""
         body = "\n".join([str(r) for r in rep.regressions] + [str(c) for c in rep.undeclared] + list(rep.advice))
         self.push_screen(MessageBox("Stopped: something changed that should not have", body))
+
+    def dashboard_alerts(self, rep: DoctorReport) -> None:
+        """Hook for the breakage alert list (P3.5)."""
+
+    def run_reboot_check(self) -> None:
+        rep = self.last_report
+        if self.session is None or rep is None or not rep.offer_reboot:
+            self.notify("The reboot check is offered after a risky plan (system debloat, keyboard, expert).",
+                        severity="warning")
+            return
+        self._reboot_worker(rep)
+
+    @work(thread=True, exclusive=True, group="plan")
+    def _reboot_worker(self, before: RunReport) -> None:
+        from droidforge.engine.reboot import reboot_check
+        s = self.session
+        assert s is not None
+        try:
+            rep = reboot_check(s.device, before, self.confirm_blocking, sleep=self.sleep, dry_run=self.dry_run,
+                               history=s.history, profile=s.profile, expert_mode=self.expert)
+        except Exception as e:
+            self.call_from_thread(self._crashed, before.plan, e)
+            return
+        self.call_from_thread(self._plan_finished, rep, None)

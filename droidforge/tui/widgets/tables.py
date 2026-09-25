@@ -50,7 +50,7 @@ class PackageTable(Vertical):
         t.clear()
         for r in self.visible_rows():
             lock = LOCK_TEXT.get(r.verdict.level)
-            t.add_row("[x]" if r.pkg in self.selected else "[ ]",
+            t.add_row(Text("[x]" if r.pkg in self.selected else "[ ]", style="bold" if r.pkg in self.selected else ""),
                       Text(r.status, style=STATUS_STYLE.get(r.status, "")),
                       Text(r.tier or "-", style=TIER_STYLE.get(r.tier, "dim")), r.pkg,
                       Text(lock[0], style=lock[1]) if lock else "", r.description, key=r.pkg)
