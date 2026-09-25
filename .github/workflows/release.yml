@@ -1,0 +1,32 @@
+name: release
+
+# Publishes "DroidForge-v<version>" from droidforge/__init__.py when main's version changes (or on demand).
+# Release notes are that version's section of CHANGELOG.md. An existing release is never touched.
+on:
+  push:
+    branches: [main]
+    paths: ["droidforge/__init__.py", ".github/workflows/release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the release if it does not exist yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ver=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' droidforge/__init__.py)
+          tag="DroidForge-v${ver}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists - nothing to do."
+            exit 0
+          fi
+          awk -v v="$ver" '$0 ~ "^## " v "( |$)" {on=1; next} /^## / && on {exit} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
+          gh release create "$tag" --target "$GITHUB_SHA" --title "DroidForge ${ver}" --notes-file notes.md
