@@ -126,7 +126,32 @@ def sc_make_expert(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
                               ["com.android.ims.rcsservice"])
 
 
+def sc_open_language(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import language
+    return language.open_language_settings(dev)
+
+
+def sc_open_app_languages(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import language
+    return language.open_app_languages(dev)
+
+
+def sc_app_language(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import language
+    return language.app_language_plan(dev, ["com.whatsapp", "com.tencent.mm", "com.android.settings"],
+                                      "en-US,ar-EG")
+
+
+def sc_reset_app_language(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import language
+    return language.reset_app_language_plan(dev, ["com.tencent.mm"])
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.language.open_language_settings": sc_open_language,
+    "droidforge.features.language.open_app_languages": sc_open_app_languages,
+    "droidforge.features.language.app_language_plan": sc_app_language,
+    "droidforge.features.language.reset_app_language_plan": sc_reset_app_language,
     "droidforge.engine.reboot.reboot_plan": sc_reboot_plan,
     "droidforge.engine.safety.make_expert": sc_make_expert,
     "droidforge.engine.profile.Profile.reapply": sc_profile_reapply,
@@ -161,11 +186,24 @@ def _writes(plan: Plan) -> List:
     return [s for s in plan.steps if s.risk != "read"]
 
 
+def _read_only_plan(name: str, plan: Plan, sim: Device, phone: FakePhone) -> None:
+    """Plans that only open screens: every step is an allowed read and running them changes nothing."""
+    for s in plan.steps:
+        assert not guard.check_command(s.cmd, sim, s.host).write, f"{name}: {s.cmd} is marked read but writes"
+    before = phone.state()
+    rep = executor.run(plan, sim, confirm_all, sleep=no_sleep)
+    assert rep.status == "done" and rep.undeclared == [] and rep.regressions == []
+    assert phone.state() == before, f"{name}: a read-only plan changed the phone"
+
+
 @pytest.mark.parametrize("name", sorted(SCENARIOS))
 def test_invariants(name: str, sim: Device, phone: FakePhone, tmp_path: Path) -> None:
     plan = SCENARIOS[name](phone, sim, tmp_path)
+    assert plan.steps, f"{name}: scenario produced an empty plan"
     writes = _writes(plan)
-    assert writes, f"{name}: scenario produced no write step"
+    if not writes:
+        _read_only_plan(name, plan, sim, phone)
+        return
 
     # static: guard, touches, undo (P2, P8, P10)
     for s in plan.steps:

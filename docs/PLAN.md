@@ -73,7 +73,7 @@ the health gate is not done.
 
 ## Phase 2 - Port legacy features
 
-- [ ] **P2.1** `features/language.py` (R-3.1, R-3.2): read-only device-language check; open Language settings with
+- [x] **P2.1** `features/language.py` (R-3.1, R-3.2): read-only device-language check; open Language settings with
   instructions; re-read and report. Per-app language for user-picked non-system apps only, previous value kept.
   Accept: no plan built by this module contains a Forbidden command (guard test); picking a system app is
   refused with an explanation; undo restores the exact previous app locale.

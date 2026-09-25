@@ -71,11 +71,44 @@ def test_no_device_side_binaries() -> None:
 WRITE_PATH_OWNERS = {PKG / "engine" / "executor.py", PKG / "adb" / "device.py"}
 
 
+def _calls(path: Path, names: set) -> list:
+    hits = []
+    for n in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(n, ast.Call):
+            f = n.func
+            name = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else ""
+            if name in names:
+                hits.append((name, n.lineno))
+    return hits
+
+
 def test_only_executor_calls_device_sh() -> None:
     """CLAUDE.md: nothing reaches the device except through engine/executor.py."""
     for path in MODULES:
         if path in WRITE_PATH_OWNERS:
             continue
-        for n in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "sh":
-                raise AssertionError(f"{path}:{n.lineno} calls .sh() - writes go through engine/executor.py")
+        for name, line in _calls(path, {"sh", "run_host"}):
+            raise AssertionError(f"{path}:{line} calls {name}() - writes go through engine/executor.py")
+
+
+def test_raw_transport_stays_in_the_adb_layer() -> None:
+    """Device.adb() and Backend.run() bypass the guard: only the adb layer itself may use them."""
+    for path in MODULES:
+        if path.parent.name == "adb" and path.parent.parent == PKG:
+            continue
+        hits = [(n, ln) for n, ln in _calls(path, {"adb", "run"}) if n == "adb" or "backend" in
+                path.read_text(encoding="utf-8").splitlines()[ln - 1]]
+        assert not hits, f"{path}: raw adb transport outside droidforge/adb: {hits}"
+
+
+SUBPROCESS_OWNERS = {PKG / "adb" / "real.py", PKG / "adb" / "hostcmd.py"}
+
+
+def test_subprocess_only_in_the_adb_layer() -> None:
+    """Host commands go through adb/hostcmd.py (guarded by the executor); nothing else shells out."""
+    for path in MODULES:
+        if path in SUBPROCESS_OWNERS:
+            continue
+        mods = _imports(path)
+        assert not ({"subprocess", "os"} & mods and "subprocess" in mods), f"{path} imports subprocess"
+        assert "os.system" not in path.read_text(encoding="utf-8"), f"{path} uses os.system"
