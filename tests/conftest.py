@@ -22,7 +22,15 @@ def phone():
 
 @pytest.fixture
 def sim(phone):
-    """Device(SimBackend(FakePhone)) - the only 'phone' any test talks to."""
+    """Device(SimBackend(FakePhone)) with the real guard - the only 'phone' any test talks to."""
+    from droidforge.adb.sim import sim_device
+    from droidforge.log import Logger
+    return sim_device(phone, log=Logger(3))
+
+
+@pytest.fixture
+def raw_sim(phone):
+    """The simulator without the guard - only for tests of the simulator itself and fault injection."""
     from droidforge.adb.sim import sim_device
     from droidforge.log import Logger
     return sim_device(phone, log=Logger(3), read_guard=None, write_guard=None)

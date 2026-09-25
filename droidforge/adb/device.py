@@ -15,19 +15,19 @@ from typing import Callable, Dict, List, Optional, Set, Tuple
 from droidforge.adb.backend import Backend, RunResult
 from droidforge.log import LOG, Logger
 
-Guard = Callable[[str], None]
+Guard = Callable[[str, "Device"], None]
 
 PKG_RE = re.compile(r"^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$")
 
 
-def _default_read_guard(cmd: str) -> None:
+def _default_read_guard(cmd: str, device: "Device") -> None:
     from droidforge.engine import guard  # lazy: adb must not depend on engine at import time
-    guard.check_read(cmd)
+    guard.check_read(cmd, device)
 
 
-def _default_write_guard(cmd: str) -> None:
+def _default_write_guard(cmd: str, device: "Device") -> None:
     from droidforge.engine import guard
-    guard.check_command(cmd)
+    guard.check_command(cmd, device)
 
 
 def list_devices(backend: Backend) -> List[Tuple[str, str]]:
@@ -99,7 +99,7 @@ class Device:
     def read(self, cmd: str, timeout: float = 30, plumbing: bool = True) -> RunResult:
         """Run a read-only shell command (checked against the read allowlist)."""
         if self.read_guard is not None:
-            self.read_guard(cmd)
+            self.read_guard(cmd, self)
         return self.adb(["shell", cmd], timeout=timeout, plumbing=plumbing)
 
     def out(self, cmd: str, plumbing: bool = True) -> str:
@@ -108,7 +108,7 @@ class Device:
     def sh(self, cmd: str, timeout: float = 60) -> RunResult:
         """WRITE path - engine/executor.py only."""
         if self.write_guard is not None:
-            self.write_guard(cmd)
+            self.write_guard(cmd, self)
         try:
             return self.adb(["shell", cmd], timeout=timeout, plumbing=False)
         finally:

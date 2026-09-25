@@ -93,10 +93,10 @@ def test_serial_prefix_and_pretty() -> None:
 def test_guards_are_called() -> None:
     seen: List[str] = []
 
-    def rg(c: str) -> None:
+    def rg(c: str, _d: Device) -> None:
         seen.append("r:" + c)
 
-    def wg(c: str) -> None:
+    def wg(c: str, _d: Device) -> None:
         if "evil" in c:
             raise PermissionError(c)
         seen.append("w:" + c)

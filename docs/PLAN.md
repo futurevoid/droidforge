@@ -29,7 +29,7 @@ the health gate is not done.
 
 ## Phase 1 - Engine
 
-- [ ] **P1.1** (P8) `engine/guard.py`: READ/WRITE/FORBIDDEN patterns from COMMANDS.md, P12 check for
+- [x] **P1.1** (P8) `engine/guard.py`: READ/WRITE/FORBIDDEN patterns from COMMANDS.md, P12 check for
   `set-app-locales` (system packages, overlays, framework, Settings, SystemUI, PermissionController, launcher,
   IMEs refused). Accept: `tests/test_guard.py` parses COMMANDS.md - every write row has a pattern and every
   pattern has a row; every Forbidden row is refused (incl. `app_process`, `system_locales`, `CHANGE_CONFIGURATION`,
