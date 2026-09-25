@@ -8,6 +8,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Checkbox, Label, Static
 
+from droidforge.adb import labels
 from droidforge.data.presets import CATALOG
 from droidforge.features import keepalive, powerperms, region
 from droidforge.tui.screens.base import Section
@@ -40,14 +41,15 @@ class KeepAliveSection(Section):
     def refresh_from(self, app: "DroidforgeApp") -> None:
         dev = self.device
         if dev is not None:
-            def read() -> Tuple[List[str], Dict[str, str], List[str]]:
+            def read() -> Tuple[List[str], Dict[str, str], List[str], Dict[str, str]]:
                 pkgs = keepalive.candidates(dev)
-                return pkgs, keepalive.statuses(dev, pkgs), powerperms.installed_presets(dev)
+                return (pkgs, keepalive.statuses(dev, pkgs), powerperms.installed_presets(dev),
+                        labels.lookup(dev, pkgs))
             app.background(read, self.show)
 
-    def show(self, res: Tuple[List[str], Dict[str, str], List[str]]) -> None:
-        pkgs, status, presets = res
-        self.query_one(AppPicker).load(pkgs, status)
+    def show(self, res: Tuple[List[str], Dict[str, str], List[str], Dict[str, str]]) -> None:
+        pkgs, status, presets, names = res
+        self.query_one(AppPicker).load(pkgs, status, names)
         self.presets = presets
         self.query_one("#pp-presets-btn", Button).label = (
             "Grant presets: " + ", ".join(CATALOG[k].name for k in presets)) if presets else "No preset apps installed"

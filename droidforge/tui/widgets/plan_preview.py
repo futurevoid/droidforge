@@ -30,12 +30,15 @@ class TypedConfirm(Input):
         return self.value == self.expected
 
 
-def step_text(i: int, s: Step) -> Text:
+def step_text(i: int, s: Step, name: str = "") -> Text:
     label, style = BADGE.get(s.risk, BADGE["normal"])
     t = Text()
     t.append(f"{i:>2}. ")
     t.append(f" {label} ", style=style)
-    t.append(f" {s.label}\n", style="bold")
+    t.append(f" {s.label}", style="bold")
+    if name:
+        t.append(f"  app: {name}", style="bold cyan")
+    t.append("\n")
     t.append(f"      {'host' if s.host else 'adb shell'}: {s.cmd}\n")
     for u in s.undo:
         t.append(f"      undo: {u}\n", style="green")
@@ -88,7 +91,7 @@ class PlanPreview(ModalScreen[Confirmation]):
             yield Label(head)
             with VerticalScroll(id="steps"):
                 for i, s in enumerate(p.steps, 1):
-                    yield Static(step_text(i, s), classes="step")
+                    yield Static(step_text(i, s, p.names.get(s.pkg or "", "")), classes="step")
             if p.notes:
                 yield Static("\n".join(f"! {n}" for n in p.notes), id="notes", markup=False)
             if p.typed:

@@ -139,7 +139,8 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
 def preview_lines(plan: Plan) -> List[str]:
     out = [f"Plan: {plan.title}  ({len(plan.steps)} step(s), {len(plan.batches())} batch(es))"]
     for i, st in enumerate(plan.steps, 1):
-        out.append(f" {i:>2}. [{st.risk.upper()}] {st.label}")
+        name = plan.names.get(st.pkg or "")
+        out.append(f" {i:>2}. [{st.risk.upper()}] {st.label}" + (f'  -- app: "{name}"' if name else ""))
         out.append(f"       {'host' if st.host else 'adb shell'}: {st.cmd}")
         out += [f"       undo: {u}" for u in st.undo]
         out += [f"       then if refused: {fb.cmd}" for fb in st.fallbacks]
@@ -308,9 +309,11 @@ def pick_keepalive(dev: "Device", remove: bool, ask: Optional[Callable[[str], st
     if not items:
         print("No apps to pick." if not remove else "No app is kept alive by droidforge.")
         return []
+    from droidforge.adb import labels
+    names = labels.lookup(dev, items)
     w = len(str(len(items)))
     for n, p in enumerate(items, 1):
-        print(ascii_safe(f" {n:>{w}}) {p:<48} {('[' + st[p] + ']') if st.get(p) else ''}"))
+        print(ascii_safe(f" {n:>{w}}) {names.get(p, ''):<24.24} {p:<44} {('[' + st[p] + ']') if st.get(p) else ''}"))
     try:
         text = (ask or input)("Pick apps (e.g. 1,4,7 or 2-9; Enter = cancel): ")
     except EOFError:

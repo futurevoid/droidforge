@@ -129,6 +129,8 @@ RULES: Tuple[Rule, ...] = (
       ((DI, "SDK / release / build"), (DI, "Brand / model"), (DI, "ROM family"), (LA, "Read device locales"),
        (HP, "Boot completed (R-11.9)"))),
     R("pm-list", r"pm list packages(?: -[dus3Ufe]+)*", ((DI, "Package lists"), (AU, "UID map"))),
+    R("app-label", r"unzip -p '/[A-Za-z0-9_./~=+\-]+\.apk' (?:AndroidManifest\.xml|resources\.arsc) \| base64",
+      ((DI, "App names (labels)"),)),
     R("focused", r"dumpsys window \| grep -E 'mCurrentFocus\|mFocusedApp'", ((DI, "Focused app"),)),
     R("resolve-home", r"cmd package resolve-activity --brief -a android\.intent\.action\.MAIN "
                       r"-c android\.intent\.category\.HOME", ((DI, "Current launcher"), (HP, "IME / launcher"))),

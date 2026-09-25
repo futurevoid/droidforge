@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 RISKS = ("read", "normal", "risky", "locked")
 BATCH_SIZE = 5  # P13
@@ -63,6 +63,7 @@ class Plan:
     batch_size: int = BATCH_SIZE
     reboot_check: bool = False                       # R-11.9: offer "reboot now and re-check" afterwards
     expert: bool = False                             # contains locked packages (expert mode, batches of one)
+    names: Dict[str, str] = field(default_factory=dict)  # package -> app name, display only (adb/labels.py)
 
     @property
     def writes(self) -> List[Step]:

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Input, Label, Static
 
+from droidforge.adb import labels
 from droidforge.data import uad
 from droidforge.features import firewall
 from droidforge.tui.screens.base import Section
@@ -33,20 +34,21 @@ class FirewallSection(Section):
         if dev is None or s is None:
             return
 
-        def read() -> Tuple[bool, List[str], List[str]]:
+        def read() -> Tuple[bool, List[str], List[str], Dict[str, str]]:
             ok = firewall.supported(dev)
-            return ok, sorted(dev.packages("-3")), firewall.missing_rules(dev, s.profile) if ok else []
+            apps = sorted(dev.packages("-3"))
+            return ok, apps, firewall.missing_rules(dev, s.profile) if ok else [], labels.lookup(dev, apps)
         app.background(read, self.show)
 
-    def show(self, res: Tuple[bool, List[str], List[str]]) -> None:
-        ok, apps, missing = res
+    def show(self, res: Tuple[bool, List[str], List[str], Dict[str, str]]) -> None:
+        ok, apps, missing, names = res
         s = self.dapp.session
         blocked = s.profile.firewall if s else []
         msg = firewall.UNSUPPORTED if not ok else f"Blocked by droidforge: {', '.join(blocked) or 'none'}"
         if missing:
             msg += f"\nRules missing (reboot): {', '.join(missing)}"
         self.query_one("#fw-status", Static).update(msg)
-        self.query_one(AppPicker).load(apps)
+        self.query_one(AppPicker).load(apps, None, names)
 
     def _picked(self) -> List[str]:
         extra = self.query_one("#fw-pkg", Input).value.strip()

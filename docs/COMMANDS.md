@@ -27,6 +27,7 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | Brand / model | `getprop ro.product.brand` / `ro.product.model` | L |
 | ROM family | `getprop ro.build.version.oplusrom` (ColorOS/realme UI version on oplus builds) | V |
 | Package lists | `pm list packages` / `-d` (disabled) / `-u` (incl. uninstalled for user) / `-s` / `-3` / `-U` (uid) / `-f` (path) | L (`-U`,`-f`: S, AOSP) |
+| App names (labels) | `pm list packages -f -u` (APK paths), then `unzip -p '<apk>' AndroidManifest.xml \| base64` and, when the label is a resource, `unzip -p '<apk>' resources.arsc \| base64`; parsed on the host (`adb/labels.py`), cached per APK path. `unzip` is Android's ziptool (AOSP since 9); nothing is written on the phone | V (ziptool on ColorOS) |
 | Focused app | `dumpsys window \| grep -E 'mCurrentFocus\|mFocusedApp'` | L |
 | Current launcher | `cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME` | L |
 | Package details / runtime perms / signer | `dumpsys package <p>` (parse `runtime permissions:`, `signatures=`) | L (signatures: V) |

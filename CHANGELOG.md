@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- App names next to package names (plan preview, debloat list, keep-alive / firewall pickers, CLI keep-alive
+  picker): read from each app's own APK (English first), cached per APK version, so the right app is picked.
+- The "Disable permission monitoring" health probe reads `persist.sys.permission.enable` (confirmed on the Neo 8).
+
 ## 1.0.2 - 2026-09-25
 
 - TUI keeps looking for the phone when none is connected at start: plugging in USB or accepting the

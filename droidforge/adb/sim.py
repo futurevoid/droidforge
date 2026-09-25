@@ -13,9 +13,11 @@ Fault injection:
 
 from __future__ import annotations
 
+import base64
 import copy
 import re
 import shlex
+import struct
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
@@ -78,11 +80,65 @@ class Pkg:
     activities: List[str] = field(default_factory=list)
     refuse: Set[str] = field(default_factory=set)             # ops the ROM refuses: disable / suspend / uninstall
     running: bool = False
+    labels: Dict[str, str] = field(default_factory=dict)      # app name per language ("" = default resources)
 
     @property
     def path(self) -> str:
         short = self.name.rsplit(".", 1)[-1]
         return f"/system/priv-app/{short}/{short}.apk" if self.system else f"/data/app/~~sim/{self.name}-1/base.apk"
+
+
+# ---------------------------------------------------------------------- fake APK parts (app names, adb/labels.py)
+LABEL_RES = 0x7F010000
+
+
+def _pool(strings: List[str]) -> bytes:
+    data, offsets = b"", []
+    for s in strings:
+        offsets.append(len(data))
+        b = s.encode()
+        data += bytes([len(s), len(b)]) + b + b"\x00"
+    while len(data) % 4:
+        data += b"\x00"
+    start = 28 + 4 * len(strings)
+    return struct.pack("<HHIIIIII", 0x0001, 28, start + len(data), len(strings), 0, 1 << 8, start, 0) + \
+        struct.pack(f"<{len(strings)}I", *offsets) + data
+
+
+def _element(name: int, attrs: List[Tuple[int, int, int, int]]) -> bytes:
+    body = struct.pack("<IIIIHHHHHH", 0, 0xFFFFFFFF, 0xFFFFFFFF, name, 20, 20, len(attrs), 0, 0, 0)
+    for aname, raw, dtype, data in attrs:
+        body += struct.pack("<IIIHBBI", 0xFFFFFFFF, aname, raw, 8, 0, dtype, data)
+    return struct.pack("<HHI", 0x0102, 16, 8 + len(body)) + body
+
+
+def fake_manifest(pkg: str) -> bytes:
+    """Binary AndroidManifest.xml: <manifest package=pkg><application android:label=@0x7f010000>."""
+    strings = ["label", "manifest", "package", pkg, "application"]
+    resmap = struct.pack("<HHI", 0x0180, 8, 12) + struct.pack("<I", 0x01010001)
+    body = _pool(strings) + resmap + _element(1, [(2, 3, 0x03, 3)]) + \
+        _element(4, [(0, 0xFFFFFFFF, 0x01, LABEL_RES)])
+    return struct.pack("<HHI", 0x0003, 8, 8 + len(body)) + body
+
+
+def fake_arsc(labels: Dict[str, str]) -> bytes:
+    """resources.arsc with one string resource (LABEL_RES) in one config per language."""
+    langs = sorted(labels)
+    types = b""
+    for i, lang in enumerate(langs):
+        cfg = bytearray(64)
+        struct.pack_into("<I", cfg, 0, 64)
+        cfg[8:10] = lang.encode()[:2].ljust(2, b"\x00") if lang else b"\x00\x00"
+        hsize = 20 + len(cfg)
+        entry = struct.pack("<HHI", 8, 0, 0) + struct.pack("<HBBI", 8, 0, 0x03, i)
+        chunk = struct.pack("<BBHII", 1, 0, 0, 1, hsize + 4) + bytes(cfg) + struct.pack("<I", 0) + entry
+        types += struct.pack("<HHI", 0x0201, hsize, 8 + len(chunk)) + chunk
+    tpool, kpool = _pool(["string"]), _pool(["app_name"])
+    head = struct.pack("<I", 0x7F) + "sim".encode("utf-16-le").ljust(256, b"\x00") + \
+        struct.pack("<IIIII", 288, 1, 288 + len(tpool), 1, 0)
+    pkg = struct.pack("<HHI", 0x0200, 288, 288 + len(tpool) + len(kpool) + len(types)) + head + tpool + kpool + types
+    values = _pool([labels[lang] for lang in langs])
+    return struct.pack("<HHII", 0x0002, 12, 12 + len(values) + len(pkg), 1) + values + pkg
 
 
 @dataclass
@@ -320,6 +376,16 @@ IME_GBOARD = "com.google.android.inputmethod.latin/com.android.inputmethod.latin
 NOTIF = "android.permission.POST_NOTIFICATIONS"
 
 
+SIM_LABELS: Dict[str, Dict[str, str]] = {
+    "com.heytap.market": {"": "软件商店", "en": "App Market"},
+    "com.android.settings": {"": "设置", "en": "Settings"},
+    "com.oplus.appdetail": {"": "应用详情", "en": "App details"},
+    "com.whatsapp": {"": "WhatsApp"},
+    "org.telegram.messenger": {"": "Telegram"},
+    "com.tencent.mm": {"": "微信", "en": "WeChat"},
+}
+
+
 def neo8_cn() -> FakePhone:
     """Default seed: realme Neo 8, China ROM, Android 16 - package set from docs/PACKAGES.md."""
     ph = FakePhone()
@@ -365,6 +431,9 @@ def neo8_cn() -> FakePhone:
     ph.resolve.update({ACTION_SETTINGS: COLOROS_SETTINGS, ACTION_PERMS: COLOROS_PERMS, HOME: COLOROS_LAUNCHER})
     ph.roles = {"android.app.role.BROWSER": ["com.heytap.browser"], "android.app.role.SMS": ["com.android.mms"],
                 "android.app.role.DIALER": ["com.android.contacts"], "android.app.role.HOME": ["com.android.launcher"]}
+    for n, names in SIM_LABELS.items():   # what Settings > Apps shows (default resources are Chinese on a CN ROM)
+        if n in ph.packages:
+            ph.packages[n].labels = dict(names)
     return ph
 
 
@@ -541,6 +610,10 @@ class SimBackend:
             out, code = r.out, r.exit
             for stage in pipe[1:]:
                 toks = shlex.split(stage)
+                if toks == ["base64"]:
+                    raw = base64.b64encode(out.encode("latin-1")).decode()
+                    out, code = "\n".join(raw[i:i + 76] for i in range(0, len(raw), 76)), 0
+                    continue
                 if toks[:1] != ["grep"]:
                     raise Unsupported(stage)
                 out, code = _grep(out, toks[1:])
@@ -579,6 +652,20 @@ class SimBackend:
         if self.phone.root is None:
             return R(127, "", "/system/bin/sh: su: inaccessible or not found", 1)
         raise Unsupported(" ".join(t))  # root commands are simulated in Phase 7
+
+    def _c_unzip(self, t: List[str]) -> RunResult:
+        """`unzip -p <apk> AndroidManifest.xml|resources.arsc` - bytes as latin-1 text (the base64 stage encodes)."""
+        if len(t) != 4 or t[1] != "-p":
+            raise Unsupported(" ".join(t))
+        pkg = next((p for p in self.phone.packages.values() if p.present and p.path == t[2]), None)
+        if pkg is None:
+            return R(9, "", f"unzip: couldn't open {t[2]}", 1)
+        labels = pkg.labels or {"": pkg.name.rsplit(".", 1)[-1].capitalize()}
+        if t[3] == "AndroidManifest.xml":
+            return _ok(fake_manifest(pkg.name).decode("latin-1"))
+        if t[3] == "resources.arsc":
+            return _ok(fake_arsc(labels).decode("latin-1"))
+        return R(11, "", f"unzip: {t[3]}: not found", 1)
 
     def _c_cat(self, t: List[str]) -> RunResult:
         files = t[1:]
