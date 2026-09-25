@@ -40,7 +40,7 @@ the health gate is not done.
     `next_alarm_formatted`, ...). P10 as written flags every undeclared change, so these would stop a plan on a
     real device. Implemented strictly for now (no ignore-list). Phase 9 will show which keys are noisy - may
     droidforge then keep a reviewed ignore-list of volatile keys (never containing P9b display/UI keys)?
-- [ ] **P1.3** (P0, P11, R-11.7) `engine/health.py`: probes + baseline compare. Accept: `break_ui()` on the sim is
+- [x] **P1.3** (P0, P11, R-11.7) `engine/health.py`: probes + baseline compare. Accept: `break_ui()` on the sim is
   reported as 2+ regressions; a healthy sim reports none; sim `permission_monitoring=True` is reported with the
   "turn it off" message even when the baseline already had it on.
 - [ ] **P1.4** (R-11.1, R-11.5, P1, P5, P13, P15) `engine/plan.py` (`Step.touches`) + `engine/executor.py`: guard

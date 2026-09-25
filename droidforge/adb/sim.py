@@ -20,13 +20,10 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from droidforge.adb.backend import EXIT_NOT_FOUND, RunResult
+from droidforge.data.device_keys import PERMISSION_MONITORING_KEY, PERMISSION_MONITORING_NS
 
 SIM_SERIAL = "SIMNEO8CN01"
 
-# Placeholder for the setting behind Developer options > "Disable permission monitoring". The real key is
-# recorded in Phase 9 (docs/COMMANDS.md "Health probes"); until then only the simulator answers it.
-PERMISSION_MONITORING_NS = "global"
-PERMISSION_MONITORING_KEY = "droidforge_placeholder_permission_monitoring_disabled"
 
 COLOROS_SETTINGS = "com.android.settings/com.oplus.settings.feature.homepage.OplusSettingsHomepageActivity"
 AOSP_SETTINGS = "com.android.settings/com.android.settings.homepage.SettingsHomepageActivity"
