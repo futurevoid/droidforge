@@ -120,7 +120,7 @@ the health gate is not done.
 - [x] **P4.7** `features/keepalive.py` (R-6.3) and `features/powerperms.py` (R-6.4).
 - [x] **P4.8** `features/region.py` (R-3.3): opens Regional preferences and Date & time only - no writes.
   Accept: guard test proves the module can only emit `am start` reads. (Tweaks removed - P9b.)
-- [ ] **P4.9** `features/ota.py` fingerprint change -> diff vs profile -> prompt re-apply (R-2.5, P14);
+- [x] **P4.9** `features/ota.py` fingerprint change -> diff vs profile -> prompt re-apply (R-2.5, P14);
   `notify.py` (R-2.7).
 - [ ] **P4.10** TUI screens for all of Phase 4; CLI can reach every plan.
 

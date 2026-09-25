@@ -43,3 +43,17 @@ def run_host(cmd: str, device: "Device", timeout: float = 600) -> RunResult:
     ms = r.ms or int((time.monotonic() - t0) * 1000)
     device.log.result(r.exit, ms, r.out, r.err)
     return r
+
+
+def notify(cmd: str, device: "Device" = None) -> bool:  # type: ignore[assignment]
+    """Run an (already guard-checked) notify-send command; simulated backends only record it."""
+    sim_runner = getattr(getattr(device, "backend", None), "run_host", None)
+    if sim_runner is not None:
+        return sim_runner(split(cmd)).ok
+    import shutil
+    if not shutil.which("notify-send"):
+        return False
+    try:
+        return subprocess.run(split(cmd), capture_output=True, timeout=10).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
