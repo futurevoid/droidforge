@@ -173,7 +173,56 @@ def sc_secure_keyboard(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return keyboard.secure_keyboard_plan(dev, include_framework=True)
 
 
+def sc_debloat_disable(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import debloat
+    from tests.helpers import UAD_SAMPLE
+    return debloat.disable_plan(dev, ["com.heytap.market", "com.opos.cs", "com.baidu.input_oppo",
+                                      "com.android.systemui"], UAD_SAMPLE)
+
+
+def sc_debloat_remove(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import debloat
+    from tests.helpers import UAD_SAMPLE
+    return debloat.remove_plan(dev, ["com.heytap.pictorial", "com.heytap.mcs"], UAD_SAMPLE)
+
+
+def sc_debloat_force(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import debloat
+    from tests.helpers import UAD_SAMPLE
+    return debloat.force_plan(dev, ["com.oplus.sauhelper", "com.coloros.prome.service", "com.opos.cs"], UAD_SAMPLE)
+
+
+def sc_debloat_neuter(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import debloat
+    from tests.helpers import UAD_SAMPLE
+    return debloat.neuter_plan(dev, ["com.heytap.market", "com.nearme.gamecenter"], UAD_SAMPLE)
+
+
+def sc_debloat_enable(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import debloat
+    from tests.helpers import UAD_SAMPLE
+    prof = Profile.for_device(phone.serial)
+    pre = debloat.neuter_plan(dev, ["com.heytap.market"], UAD_SAMPLE)
+    pre.steps += debloat.force_plan(dev, ["com.oplus.sauhelper"], UAD_SAMPLE).steps
+    pre.steps += debloat.disable_plan(dev, ["com.opos.cs"], UAD_SAMPLE).steps
+    assert executor.run(pre, dev, confirm_all, profile=prof).status == "done"
+    return debloat.enable_plan(dev, ["com.heytap.market", "com.oplus.sauhelper", "com.opos.cs"], prof, UAD_SAMPLE)
+
+
+def sc_debloat_restore(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import debloat
+    from tests.helpers import UAD_SAMPLE
+    assert executor.run(debloat.remove_plan(dev, ["com.heytap.mcs"], UAD_SAMPLE), dev, confirm_all).status == "done"
+    return debloat.restore_plan(dev, ["com.heytap.mcs", "com.opos.cs"], UAD_SAMPLE)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.debloat.disable_plan": sc_debloat_disable,
+    "droidforge.features.debloat.remove_plan": sc_debloat_remove,
+    "droidforge.features.debloat.force_plan": sc_debloat_force,
+    "droidforge.features.debloat.neuter_plan": sc_debloat_neuter,
+    "droidforge.features.debloat.enable_plan": sc_debloat_enable,
+    "droidforge.features.debloat.restore_plan": sc_debloat_restore,
     "droidforge.features.keyboard.gboard_plan": sc_gboard,
     "droidforge.features.keyboard.gboard_languages_plan": sc_gboard_languages,
     "droidforge.features.keyboard.chinese_imes_plan": sc_chinese_imes,

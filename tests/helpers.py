@@ -51,3 +51,23 @@ def replay_recovery(path: str, backend: SimBackend, serial: Optional[str] = None
     from pathlib import Path
     for ser, cmd in recovery.parse(Path(path)):
         backend.run(["-s", serial or ser, "shell", cmd])
+
+
+# A small UAD-NG sample covering the simulator seed (the real list is downloaded at runtime).
+UAD_SAMPLE = {
+    "com.heytap.market": {"list": "Oem", "removal": "Recommended", "description": "HeyTap app market",
+                          "neededBy": ["com.nearme.gamecenter"], "dependencies": []},
+    "com.nearme.gamecenter": {"list": "Oem", "removal": "Recommended", "description": "Game center"},
+    "com.heytap.pictorial": {"list": "Oem", "removal": "Recommended", "description": "Lock-screen magazine"},
+    "com.coloros.pictorial": {"list": "Oem", "removal": "Unsafe", "description": "Breaks lock-screen settings"},
+    "com.opos.cs": {"list": "Oem", "removal": "Recommended", "description": "Hot apps"},
+    "com.heytap.mcs": {"list": "Oem", "removal": "Recommended", "description": "Push promos"},
+    "com.coloros.assistantscreen": {"list": "Oem", "removal": "Advanced", "description": "-1 screen"},
+    "com.coloros.gallery3d": {"list": "Oem", "removal": "Expert", "description": "Gallery"},
+    "com.oplus.sauhelper": {"list": "Oem", "removal": "Recommended", "description": "statistics placeholder"},
+    "com.coloros.prome.service": {"list": "Oem", "removal": "Recommended", "description": "feedback framework"},
+    "com.baidu.input_oppo": {"list": "Oem", "removal": "Recommended", "description": "Baidu keyboard"},
+    "com.coloros.gamespace": {"list": "Oem", "removal": "Recommended", "description": "Game space"},
+    "com.oplus.statistics.rom": {"list": "Oem", "removal": "Recommended", "description": "User Experience Program"},
+    "com.google.android.apps.photos": {"list": "Google", "removal": "Advanced", "description": "Google Photos"},
+}

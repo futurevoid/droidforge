@@ -79,7 +79,7 @@ the health gate is not done.
   refused with an explanation; undo restores the exact previous app locale.
 - [x] **P2.2** `features/keyboard.py` (R-3.4): Gboard switch, Chinese IMEs off, secure keyboard removal (IME ids
   disabled first; refuses if it is the current IME), Gboard language screen.
-- [ ] **P2.3** `data/uad.py` + `features/debloat.py` (R-4.x): list/filter/tiers, neededBy notes, actions incl.
+- [x] **P2.3** `data/uad.py` + `features/debloat.py` (R-4.x): list/filter/tiers, neededBy notes, actions incl.
   force escalation (disable->suspend->remove; firewall+neuter hook left for P4.5), neuter/un-neuter,
   keep-list, guarded phrase. Accept: port of legacy mock scenarios (protected package, suspend refused, etc.).
 - [ ] **P2.4** `features/backup.py` (R-11.3): session-start snapshot saved to disk (evidence + diff baseline);
