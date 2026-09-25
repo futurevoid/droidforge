@@ -1,5 +1,4 @@
 # Maintainer: futurevoid <https://github.com/futurevoid>
-# Draft from planning - finalised in P8.4.
 pkgname=droidforge-git
 _pkgname=droidforge
 pkgver=r0.0000000
@@ -11,6 +10,7 @@ license=('GPL-3.0-or-later')
 depends=('python' 'python-textual' 'python-qrcode' 'python-platformdirs' 'android-tools')
 optdepends=('scrcpy: screen mirroring' 'libnotify: desktop notifications')
 makedepends=('git' 'python-build' 'python-installer' 'python-hatchling')
+checkdepends=('python-pytest' 'python-pytest-asyncio')
 provides=("$_pkgname")
 conflicts=("$_pkgname")
 source=("git+$url.git")
@@ -18,12 +18,22 @@ sha256sums=('SKIP')
 
 pkgver() {
   cd "$_pkgname"
-  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  if desc=$(git describe --long --tags --abbrev=7 2>/dev/null); then
+    printf "%s" "$desc" | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'   # 1.0.0.r3.gabc1234
+  else
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  fi
 }
 
 build() {
   cd "$_pkgname"
   python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "$_pkgname"
+  # tests run against the simulated phone only
+  PYTHONPATH="$PWD" DROIDFORGE_HOME="$srcdir/testhome" python -m pytest -q
 }
 
 package() {

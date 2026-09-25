@@ -39,6 +39,7 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | Disable | `pm disable-user --user 0 <p>` | `pm enable --user 0 <p>` | L |
 | Suspend | `pm suspend --user 0 <p>` | `pm unsuspend --user 0 <p>` | L |
 | Remove for user | `pm uninstall -k --user 0 <p>` | `cmd package install-existing <p>` | L |
+| Remove for user, data wiped (ColorOS secure keyboard only) | `pm uninstall --user 0 <p>` - only `com.oplus.securitykeyboard` / `com.coloros.securitykeyboard` (PACKAGES.md: "no `-k`") | `cmd package install-existing <p>` (the app comes back; its cached data does not) | S (AOSP `pm`) |
 | Force stop | `am force-stop <p>` | - | L |
 | Neuter perms | `pm revoke <p> <perm>` | `pm grant <p> <perm>` | L |
 | Neuter app-ops | `cmd appops set <p> RUN_IN_BACKGROUND\|RUN_ANY_IN_BACKGROUND\|POST_NOTIFICATION\|SYSTEM_ALERT_WINDOW ignore` | `... default` | L |
@@ -63,13 +64,14 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | List / current | `ime list -s`, `settings get secure default_input_method` | L |
 | Enable/set Gboard | `ime enable com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME`, `ime set <same>` | L |
 | Disable IME | `ime disable <id>` (undo `ime enable <id>`) | L |
+| Open Gboard settings (languages) | `am start -n com.google.android.inputmethod.latin/com.google.android.apps.inputmethod.latin.preference.SettingsActivity` (the user adds languages there) | V (activity name) |
 
 ## Privacy / DNS / ads / install (R-5.x)
 
 | Purpose | Command | Undo | Status |
 |---|---|---|---|
 | Private DNS | `settings put global private_dns_mode hostname`; `settings put global private_dns_specifier dns.adguard-dns.com` | previous `private_dns_mode` / `_specifier` (or `off` / delete) | S (AOSP) |
-| DNS hostnames | AdGuard `dns.adguard-dns.com`, AdGuard family `family.adguard-dns.com`, Cloudflare `one.one.one.one`, Quad9 `dns.quad9.net`, Mullvad blocking `base.dns.mullvad.net`, NextDNS `<id>.dns.nextdns.io` | - | S (provider docs; re-check at implementation) |
+| DNS hostnames | AdGuard `dns.adguard-dns.com`, AdGuard family `family.adguard-dns.com`, Cloudflare `one.one.one.one`, Quad9 `dns.quad9.net`, Mullvad blocking `base.dns.mullvad.net`, NextDNS `<id>.dns.nextdns.io` | - | S (provider docs; all six resolved from the dev host on 2026-09-25) |
 | Notifications off | `pm revoke <p> android.permission.POST_NOTIFICATIONS` + `cmd appops set <p> POST_NOTIFICATION ignore` | `pm grant ...` + `... default` | L |
 | ADB install verification | `settings put global verifier_verify_adb_installs 0`; `settings put global package_verifier_enable 0` | previous values | S ([Medium cheatsheet](https://medium.com/@gbsendhil/apk-installation-failed-cheatsheet-9300668119ac)); ColorOS effect: V |
 
@@ -81,6 +83,7 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | Block / unblock app | `cmd connectivity set-package-networking-enabled false <p>` / `... true <p>` | S (ShizuWall); Neo 8: V |
 | Disable chain | `cmd connectivity set-chain3-enabled false` | S |
 | Capability probe | `cmd connectivity help` contains `set-package-networking-enabled` | V |
+| Read app block state | `cmd connectivity get-package-networking-enabled <p>` -> `false` = blocked, `true` = allowed (used to detect rules lost at reboot, and as the verify of a block) | V |
 Rules are cleared on reboot (ShizuWall README). Re-apply on connect.
 
 ## Apps & defaults (R-6.x)
@@ -88,9 +91,12 @@ Rules are cleared on reboot (ShizuWall README). Re-apply on connect.
 | Purpose | Command | Undo | Status |
 |---|---|---|---|
 | Open Play page | `am start -a android.intent.action.VIEW -d 'market://details?id=<p>'` | - | L |
+| Official APK sources (host HTTPS, only when the user asks) | GitHub `https://api.github.com/repos/<owner>/<repo>/releases/latest` -> `.apk` asset; F-Droid `https://f-droid.org/repo/index-v1.json` -> `https://f-droid.org/repo/<apkName>`; Firefox Nightly `https://download.mozilla.org/?product=fenix-nightly-latest&os=android&lang=multi` | - | S (GitHub, F-Droid docs); Mozilla URL: V (dev host proxy returned 403 on 2026-09-25) |
 | Install APK(s) (host) | `adb install -r <apk>` / `adb install-multiple -r <apks...>` | `pm uninstall <p>` (user app) | S |
 | Role holders | `cmd role get-role-holders --user 0 <role>` / `cmd role add-role-holder --user 0 <role> <p>` | re-add previous holder | V (syntax per RoleShellCommand; confirm with `cmd role help`) |
 | Keep-alive | `dumpsys deviceidle whitelist +<p>` (undo `-<p>`); `cmd appops set <p> RUN_ANY_IN_BACKGROUND allow` (undo previous mode); `am set-standby-bucket <p> active` (undo previous from `am get-standby-bucket <p>`) | as listed | S (AOSP); ColorOS still kills: V |
+| Keep-alive state (read) | `dumpsys deviceidle whitelist` (lines `user,<p>,<uid>` / `system,<p>,<uid>`); `am get-standby-bucket <p>` (10 active, 20 working_set, 30 frequent, 40 rare, 45 restricted) | - | S (AOSP) |
+| Open app info (ColorOS: Battery usage > allow background activity / auto launch) | `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:<p>` | - | S (AOSP); ColorOS switch names: V |
 | Power perms | `pm grant <p> android.permission.WRITE_SECURE_SETTINGS` / `READ_LOGS` / `DUMP`; `cmd appops set <p> GET_USAGE_STATS allow` | `pm revoke` / previous mode | S (AOSP); if ColorOS refuses the grant, report it - never suggest developer-option workarounds |
 
 ## Tweaks - removed (P9b)
@@ -123,6 +129,7 @@ Nothing here. All display/UI commands moved to "Forbidden".
 | mDNS discovery (host) | `adb mdns check`, `adb mdns services` (look for `<name>` with `_adb-tls-pairing._tcp`, then `_adb-tls-connect._tcp`) | S |
 | Pair / connect (host) | `adb pair <ip>:<port> <password>`, `adb connect <ip>:<port>` | S |
 | Shizuku path | `pm path moe.shizuku.privileged.api` -> replace `base.apk` with `lib/arm64/libshizuku.so` and run that path | S ([Shizuku discussion #462](https://github.com/RikkaApps/Shizuku/discussions/462), [DeepWiki](https://deepwiki.com/RikkaApps/Shizuku/3.3-adb-startup-method)) |
+| Shizuku status | `pidof shizuku_server` (non-empty = running) | V (process name) |
 | Shizuku fallback | `sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh` | S (older versions) |
 | Shizuku APK | GitHub API `https://api.github.com/repos/RikkaApps/Shizuku/releases/latest` -> `.apk` asset | S |
 
@@ -146,7 +153,8 @@ Nothing here. All display/UI commands moved to "Forbidden".
 |---|---|---|
 | adb / scrcpy install | `sudo pacman -S android-tools` / `sudo pacman -S scrcpy` | S |
 | Notification | `notify-send -a droidforge "<title>" "<body>"` | S |
-| Self-update | GitHub API `https://api.github.com/repos/futurevoid/droidforge/releases/latest`; pipx: `pipx upgrade droidforge`; AUR: `yay -S droidforge-git` | S |
+| Self-update | GitHub API `https://api.github.com/repos/futurevoid/droidforge/releases/latest` (no release yet: newest version tag from `.../tags`); source / pip installs: command printed, not run; pipx: `pipx upgrade droidforge`; AUR: `yay -S droidforge-git` | S |
+| Reboot check (R-11.9) | `adb -s <serial> reboot` (offered after risky plans, confirmed like any plan), then `adb -s <serial> wait-for-device` | S ([adb docs](https://developer.android.com/tools/adb)) |
 
 ## Health probes (R-11.7) - read-only
 
@@ -154,13 +162,14 @@ Nothing here. All display/UI commands moved to "Forbidden".
 |---|---|---|
 | Settings home activity | `cmd package resolve-activity --brief -a android.settings.SETTINGS` | L (owner's log: `com.android.settings/com.oplus.settings.feature.homepage.OplusSettingsHomepageActivity`) |
 | Permission UI | `cmd package resolve-activity --brief -a android.intent.action.MANAGE_APP_PERMISSIONS` | L (owner: `com.android.permissioncontroller/com.oplusos.permissioncontroller.permission.ui.ManagePermissionsActivityTrampoline`) |
-| Global configuration | `dumpsys activity \| grep -m1 mGlobalConfig` (parse locale, fontScale, density, night, ColorOS `mMaterialColor`, `mUxIconConfig`, `mFontVariationSettings`, `mDarkMode*`) | L (owner's dump) |
+| Global configuration | `dumpsys activity \| grep -m1 mGlobalConfig` (parse locale, fontScale, density, night, ColorOS `mMaterialColor`, `mUxIconConfig`, `mFontVariationSettings`, `mDarkMode*`) | L (owner's dump); the simulator's line is modelled on AOSP `Configuration.toString` + `mOplusExtraConfiguration{...}` - re-seed from the Neo 8 in Phase 9 |
 | Settings snapshot | `settings list system`, `settings list secure`, `settings list global` | L |
 | Night mode / font | `cmd uimode night`, `settings get system font_scale` | L |
 | IME / launcher | `settings get secure default_input_method`, `cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME` | L |
 | Crashes | `logcat -b crash -d -t 200` | L |
+| Boot completed (R-11.9) | `getprop sys.boot_completed` -> `1` once the phone has finished booting | S (AOSP) |
 | Process alive | `pidof com.android.systemui`, `pidof com.android.settings` | L |
-| Permission-monitoring switch off | read the setting/prop behind Developer options > "Disable permission monitoring" (key unknown yet: found in Phase 9 by the owner flipping it while droidforge diffs `settings list system/secure/global` + `getprop`; droidforge only reads) | V |
+| Permission-monitoring switch off | read the setting/prop behind Developer options > "Disable permission monitoring" (key unknown yet: found in Phase 9 by the owner flipping it while droidforge diffs `settings list system/secure/global` + `getprop`; droidforge only reads). Until then the simulator exposes it as the placeholder `settings get global droidforge_placeholder_permission_monitoring_disabled` (`1` = switch on); on a real phone that read returns `null` and the probe reports "unknown", never "healthy" | V |
 | Open Developer options (for the user to turn the switch off) | `am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS` | S |
 
 ## Forbidden (P9) - never implement, never add to the allowlist
