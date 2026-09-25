@@ -178,6 +178,16 @@ class FakePhone:
         self.config.oem["mMaterialColor"] = "0"
         self.permission_monitoring_disabled = True
 
+    def sync_imes(self) -> None:
+        """Keep `enabled_input_methods` in line with `imes` (as Android does)."""
+        self.settings["secure"]["enabled_input_methods"] = ":".join(i for i, on in self.imes.items() if on)
+
+    def set_default_ime(self, ime: str) -> None:
+        """What the user does in Settings > Keyboard (test setup)."""
+        self.imes[ime] = True
+        self.sync_imes()
+        self.settings["secure"]["default_input_method"] = ime
+
     def reboot(self) -> None:
         """Instant reboot: boot hooks run, the crash buffer and running apps reset, boot_count increments, and
         `sys.boot_completed` reads empty for a few polls (the executor must wait for it)."""
@@ -716,7 +726,7 @@ class SimBackend:
         raise Unsupported(" ".join(t))
 
     def _sync_imes(self) -> None:
-        self.phone.settings["secure"]["enabled_input_methods"] = ":".join(i for i, on in self.phone.imes.items() if on)
+        self.phone.sync_imes()
 
     # ------------------------------------------------------------------ am
     def _c_am(self, t: List[str]) -> RunResult:

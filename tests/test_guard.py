@@ -101,6 +101,7 @@ EXAMPLES: Dict[str, str] = {
     "suspend": "pm suspend --user 0 com.heytap.market",
     "remove-user0": "pm uninstall -k --user 0 com.heytap.market",
     "install-existing": "cmd package install-existing com.heytap.market",
+    "remove-user0-wipe": "pm uninstall --user 0 com.oplus.securitykeyboard",
     "force-stop": "am force-stop com.heytap.market",
     "perm": "pm revoke com.heytap.market android.permission.POST_NOTIFICATIONS",
     "appops-set": "cmd appops set com.heytap.market RUN_ANY_IN_BACKGROUND ignore",
@@ -261,6 +262,7 @@ def test_display_keys_forbidden_even_on_read_rule_namespaces(sim) -> None:
     "am start -a android.intent.action.CALL -d tel:123", "am start -a android.settings.NOT_CURATED",
     "cmd role add-role-holder --user 0 android.app.role.HOME com.x", "ime enable x", "",
     "cmd appops set com.x CAMERA allow", "su -c 'resetprop ro.debuggable 1'", "setprop ro.x 1",
+    "pm uninstall --user 0 com.heytap.market",
 ])
 def test_unknown_or_malformed_refused(cmd: str, sim) -> None:
     with pytest.raises(GuardError):

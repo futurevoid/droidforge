@@ -147,7 +147,37 @@ def sc_reset_app_language(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return language.reset_app_language_plan(dev, ["com.tencent.mm"])
 
 
+def sc_gboard(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keyboard
+    return keyboard.gboard_plan(dev)
+
+
+def sc_gboard_languages(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keyboard
+    return keyboard.gboard_languages_plan(dev)
+
+
+def _gboard_current(phone: FakePhone) -> None:
+    from droidforge.adb.sim import IME_GBOARD
+    phone.set_default_ime(IME_GBOARD)
+
+
+def sc_chinese_imes(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keyboard
+    _gboard_current(phone)
+    return keyboard.chinese_imes_plan(dev)
+
+
+def sc_secure_keyboard(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keyboard
+    return keyboard.secure_keyboard_plan(dev, include_framework=True)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.keyboard.gboard_plan": sc_gboard,
+    "droidforge.features.keyboard.gboard_languages_plan": sc_gboard_languages,
+    "droidforge.features.keyboard.chinese_imes_plan": sc_chinese_imes,
+    "droidforge.features.keyboard.secure_keyboard_plan": sc_secure_keyboard,
     "droidforge.features.language.open_language_settings": sc_open_language,
     "droidforge.features.language.open_app_languages": sc_open_app_languages,
     "droidforge.features.language.app_language_plan": sc_app_language,

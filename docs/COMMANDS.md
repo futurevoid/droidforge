@@ -39,6 +39,7 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | Disable | `pm disable-user --user 0 <p>` | `pm enable --user 0 <p>` | L |
 | Suspend | `pm suspend --user 0 <p>` | `pm unsuspend --user 0 <p>` | L |
 | Remove for user | `pm uninstall -k --user 0 <p>` | `cmd package install-existing <p>` | L |
+| Remove for user, data wiped (ColorOS secure keyboard only) | `pm uninstall --user 0 <p>` - only `com.oplus.securitykeyboard` / `com.coloros.securitykeyboard` (PACKAGES.md: "no `-k`") | `cmd package install-existing <p>` (the app comes back; its cached data does not) | S (AOSP `pm`) |
 | Force stop | `am force-stop <p>` | - | L |
 | Neuter perms | `pm revoke <p> <perm>` | `pm grant <p> <perm>` | L |
 | Neuter app-ops | `cmd appops set <p> RUN_IN_BACKGROUND\|RUN_ANY_IN_BACKGROUND\|POST_NOTIFICATION\|SYSTEM_ALERT_WINDOW ignore` | `... default` | L |
@@ -63,6 +64,7 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | List / current | `ime list -s`, `settings get secure default_input_method` | L |
 | Enable/set Gboard | `ime enable com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME`, `ime set <same>` | L |
 | Disable IME | `ime disable <id>` (undo `ime enable <id>`) | L |
+| Open Gboard settings (languages) | `am start -n com.google.android.inputmethod.latin/com.google.android.apps.inputmethod.latin.preference.SettingsActivity` (the user adds languages there) | V (activity name) |
 
 ## Privacy / DNS / ads / install (R-5.x)
 

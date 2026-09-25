@@ -61,19 +61,23 @@ def appop(p: str, op: str, mode: str, prev: Optional[str], category: str = "neut
                 [f"cmd appops set {p} {op} {prev or 'default'}"], category, p, risk, touches=[f"appop:{p}:{op}"])
 
 
+# IME toggles name no package: they change which keyboards are offered, not the keyboard app itself. (Disabling
+# the current IME would make Android pick another default - an undeclared ime:default change the diff catches.)
 def ime_enable(ime: str, category: str = "keyboard") -> Step:
     return Step(f"Enable keyboard {ime.split('/')[0]}", f"ime enable {ime}", [f"ime disable {ime}"], category,
-                ime.split("/")[0], touches=[f"ime:enabled:{ime}", "setting:secure:enabled_input_methods"])
+                None, touches=[f"ime:enabled:{ime}", "setting:secure:enabled_input_methods"])
 
 
 def ime_disable(ime: str, category: str = "keyboard") -> Step:
     return Step(f"Switch off keyboard {ime.split('/')[0]}", f"ime disable {ime}", [f"ime enable {ime}"], category,
-                ime.split("/")[0], touches=[f"ime:enabled:{ime}", "setting:secure:enabled_input_methods"])
+                None, touches=[f"ime:enabled:{ime}", "setting:secure:enabled_input_methods"])
 
 
 def ime_set(ime: str, prev: str, category: str = "keyboard") -> Step:
+    # no pkg: choosing the default keyboard does not touch either keyboard's package (the current IME is locked
+    # for debloat, but switching away from it must stay possible - and so must undoing the switch)
     return Step(f"Default keyboard -> {ime.split('/')[0]}", f"ime set {ime}", [f"ime set {prev}"] if prev else [],
-                category, ime.split("/")[0],
+                category, None,
                 touches=["ime:default", "setting:secure:default_input_method",
                          "setting:secure:selected_input_method_subtype"])
 

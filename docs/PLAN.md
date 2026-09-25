@@ -77,7 +77,7 @@ the health gate is not done.
   instructions; re-read and report. Per-app language for user-picked non-system apps only, previous value kept.
   Accept: no plan built by this module contains a Forbidden command (guard test); picking a system app is
   refused with an explanation; undo restores the exact previous app locale.
-- [ ] **P2.2** `features/keyboard.py` (R-3.4): Gboard switch, Chinese IMEs off, secure keyboard removal (IME ids
+- [x] **P2.2** `features/keyboard.py` (R-3.4): Gboard switch, Chinese IMEs off, secure keyboard removal (IME ids
   disabled first; refuses if it is the current IME), Gboard language screen.
 - [ ] **P2.3** `data/uad.py` + `features/debloat.py` (R-4.x): list/filter/tiers, neededBy notes, actions incl.
   force escalation (disable->suspend->remove; firewall+neuter hook left for P4.5), neuter/un-neuter,

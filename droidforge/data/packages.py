@@ -68,3 +68,13 @@ def is_keep(pkg: str) -> bool:
 
 def is_ota(pkg: str) -> bool:
     return pkg in OTA_PATH
+
+
+# R-3.4 keyboards
+GBOARD = "com.google.android.inputmethod.latin"
+GBOARD_IME = f"{GBOARD}/com.android.inputmethod.latin.LatinIME"
+GBOARD_SETTINGS = f"{GBOARD}/com.google.android.apps.inputmethod.latin.preference.SettingsActivity"
+CHINESE_IME_PATTERNS = ("sogou", "sohu", "baidu", "iflytek", "qqpinyin", "tencent", "pinyin", "oplus.inputmethod",
+                        "coloros.inputmethod", "heytap")
+SECURE_KEYBOARDS = ("com.oplus.securitykeyboard", "com.coloros.securitykeyboard")
+SECURE_KEYBOARD_FRAMEWORK = "com.oplus.onet"
