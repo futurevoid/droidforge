@@ -389,6 +389,11 @@ def sc_shizuku_install(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return shizuku.install_plan(dev, tmp / "shizuku.apk")
 
 
+def sc_update(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import update
+    return update.upgrade_plan("pipx", "v9.0.0")
+
+
 def sc_scrcpy_install(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     from droidforge.features.tools import scrcpy
     return scrcpy.install_plan(dev)
@@ -429,6 +434,7 @@ SCENARIOS: Dict[str, Scenario] = {
     "droidforge.features.tools.activities.curated_plan": sc_curated,
     "droidforge.features.tools.activities.launch_plan": sc_launch,
     "droidforge.features.tools.scrcpy.install_plan": sc_scrcpy_install,
+    "droidforge.features.update.upgrade_plan": sc_update,
     "droidforge.features.shizuku.start_plan": sc_shizuku_start,
     "droidforge.features.shizuku.install_plan": sc_shizuku_install,
     "droidforge.features.region.regional_plan": sc_regional,

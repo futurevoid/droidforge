@@ -58,6 +58,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
     sub.add_parser("doctor", help="read-only health and capability report (never changes the phone)")
     sub.add_parser("fix", help="breakage check vs the last healthy baseline; offers the repair plan (R-12.5)")
+    up = sub.add_parser("update", help="check GitHub for a newer droidforge and upgrade it (pipx / AUR) (R-12.4)")
+    up.add_argument("--check", action="store_true", help="only report whether an update exists")
     add_plan_commands(sub)
     return p
 
@@ -427,6 +429,33 @@ def cmd_pair(args: argparse.Namespace, host: "Device", sleep: Callable[[float], 
     return 0 if ok else 2
 
 
+def cmd_update(args: argparse.Namespace, host: "Device", opener: Optional[Callable[..., object]] = None) -> int:
+    from droidforge.engine import executor
+    from droidforge.features import update
+    try:
+        tag = update.latest(opener) if opener else update.latest()
+    except (OSError, ValueError) as e:
+        print(ascii_safe(f"Could not check for updates: {e}"))
+        return 1
+    if not update.is_newer(tag):
+        print(f"droidforge {__version__} is up to date (latest: {tag}).")
+        return 0
+    method = update.install_method()
+    print(f"droidforge {tag} is available (installed: {__version__}, via {method}).")
+    plan = update.upgrade_plan(method, tag)
+    if args.check or not plan.steps:
+        for n in plan.notes:
+            print(ascii_safe(n))
+        if args.check and plan.steps:
+            print(f"Run 'droidforge update' to upgrade ({plan.steps[0].cmd}).")
+        return 0
+    rep = executor.run(plan, host, cli_confirm(args.yes), dry_run=args.dry_run)
+    ok = rep.status == "done" and all(r.ok for r in rep.results)
+    for r in rep.results:
+        print(ascii_safe(f"[{'ok  ' if r.ok else 'FAIL'}] {r.step.label}" + ("" if r.ok else f" -> {r.err or r.out}")))
+    return 0 if ok else (1 if rep.status == "cancelled" else 2)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     _setup_logging(args.verbosity)
@@ -440,6 +469,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                   file=sys.stderr)
         if args.command == "pair":
             return cmd_pair(args, HOST_FACTORY(args.simulate))
+        if args.command == "update":
+            return cmd_update(args, HOST_FACTORY(args.simulate))
         try:
             s = SESSION_FACTORY(simulate=args.simulate, serial=args.serial, expert=args.expert,
                                 dry_run=args.dry_run)

@@ -151,7 +151,7 @@ the health gate is not done.
 
 - [x] **P8.1** Complete CLI (R-12.3) incl. `--yes`, `--allow-locked`, `--simulate`, `--dry-run`, verbosity flags.
 - [x] **P8.2** `engine/report.py` HTML session report (R-11.4).
-- [ ] **P8.3** `features/update.py` self-update (R-12.4).
+- [x] **P8.3** `features/update.py` self-update (R-12.4).
 - [ ] **P8.4** README (install via pipx / AUR, first run, safety model, screenshots from sim), CHANGELOG,
   PKGBUILD finalised, tag v1.0.0 only after Phase 9 passes.
   - Owner decision (2026-09-25): publish v1.0.0 after Phases 5, 6 and 8; Phase 7 is v2; Phase 9 runs after v1.

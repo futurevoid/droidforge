@@ -153,7 +153,7 @@ Nothing here. All display/UI commands moved to "Forbidden".
 |---|---|---|
 | adb / scrcpy install | `sudo pacman -S android-tools` / `sudo pacman -S scrcpy` | S |
 | Notification | `notify-send -a droidforge "<title>" "<body>"` | S |
-| Self-update | GitHub API `https://api.github.com/repos/futurevoid/droidforge/releases/latest`; pipx: `pipx upgrade droidforge`; AUR: `yay -S droidforge-git` | S |
+| Self-update | GitHub API `https://api.github.com/repos/futurevoid/droidforge/releases/latest` (no release yet: newest version tag from `.../tags`); source / pip installs: command printed, not run; pipx: `pipx upgrade droidforge`; AUR: `yay -S droidforge-git` | S |
 | Reboot check (R-11.9) | `adb -s <serial> reboot` (offered after risky plans, confirmed like any plan), then `adb -s <serial> wait-for-device` | S ([adb docs](https://developer.android.com/tools/adb)) |
 
 ## Health probes (R-11.7) - read-only
