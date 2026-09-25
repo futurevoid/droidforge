@@ -14,7 +14,7 @@ the health gate is not done.
 - [x] **P0.1** (R-13.1) Package skeleton per ARCHITECTURE.md; complete the draft `pyproject.toml` (hatchling, py>=3.9, deps textual/qrcode/
   platformdirs, dev: pytest/ruff), console script. No data files for the phone (P9).
   Accept: `pip install -e .` works; `droidforge --version`; `ruff check` clean; `pytest` runs (0 tests OK).
-- [ ] **P0.2** (R-11.6, P3) `config.py` (XDG dirs, config.json with theme/verbosity/last device) and `log.py` (verbosity
+- [x] **P0.2** (R-11.6, P3) `config.py` (XDG dirs, config.json with theme/verbosity/last device) and `log.py` (verbosity
   1/2/3, `trace`, `dbg`, sinks). Port the legacy log format. Accept: unit tests for level filtering + debug log
   always full.
 - [ ] **P0.3** (R-2.6) `adb/backend.py`, `adb/real.py` (timeouts -> 124, missing adb -> 127 + pacman hint), `adb/device.py`
