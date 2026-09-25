@@ -82,6 +82,7 @@ SECTION_CLASSES = {"dashboard": DashboardSection, "language": LanguageSection, "
 
 class DroidforgeApp(App[None]):
     TITLE = "droidforge"
+    RETRY_S = 2.0  # no phone yet: look again this often (plugging in / accepting the USB prompt later just works)
     CSS = """
     #main { height: 1fr; }
     #sidebar { width: 24; border-right: solid $primary; }
@@ -241,11 +242,18 @@ class DroidforgeApp(App[None]):
         self.call_from_thread(self._connected, s, label)
 
     def _connect_failed(self, msg: str, rows: List[Tuple[str, str]]) -> None:
+        if msg != self.status_text:  # retries repeat the same message; log it once
+            self.refresh_bar(device=f"no device: {msg} (waiting for the phone...)")
+            LOG.error(msg)
         self.status_text = msg
-        self.refresh_bar(device=f"no device: {msg}")
-        LOG.error(msg)
         if rows:
             self.push_screen(DevicePicker(rows), lambda serial: self.connect(serial) if serial else None)
+        else:
+            self.set_timer(self.RETRY_S, self._retry_connect)
+
+    def _retry_connect(self) -> None:
+        if self.session is None and not isinstance(self.screen, DevicePicker):
+            self.connect(self.serial)
 
     def _connected(self, s: Session, label: str) -> None:
         self.session = s

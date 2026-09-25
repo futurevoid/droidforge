@@ -20,6 +20,20 @@ def test_pick_serial() -> None:
         pick_serial([("A", "device")], "Z")
 
 
+def test_pick_serial_explains_linux_usb_states() -> None:
+    no_perm = "no permissions (user in plugdev group; are your udev rules wrong?)"
+    with pytest.raises(ConnectError, match="udev"):
+        pick_serial([("????????????", no_perm)], None)
+    with pytest.raises(ConnectError, match="offline"):
+        pick_serial([("A", "offline")], None)
+    with pytest.raises(ConnectError, match="unauthorized"):
+        pick_serial([("A", "authorizing")], None)
+    with pytest.raises(ConnectError, match="not ready"):
+        pick_serial([("A", "recovery")], None)
+    with pytest.raises(ConnectError, match="File transfer"):
+        pick_serial([], None)
+
+
 def test_simulated_session_uses_guarded_device() -> None:
     s = open_session(simulate=True)
     assert s.simulate and s.phone is not None and s.device.serial == s.phone.serial

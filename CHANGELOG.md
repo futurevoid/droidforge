@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- TUI keeps looking for the phone when none is connected at start: plugging in USB or accepting the
+  "Allow USB debugging" prompt later connects without a restart.
+- Clear messages for Linux USB states: `no permissions` (udev rules), `offline`, `authorizing`.
+- ruff rule set pinned to the classic defaults (ruff 0.16 widened its defaults).
+
 ## 1.0.0 - 2026-09-25
 
 First release. Non-root ColorOS-family phones over adb; everything tested against the `--simulate` phone.

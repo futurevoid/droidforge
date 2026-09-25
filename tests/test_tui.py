@@ -573,3 +573,27 @@ async def test_ota_prompt_on_connect(df_home: Path) -> None:
         await run_previewed(app, pilot)
         assert not phone.packages["com.heytap.mcs"].enabled
         assert any("notify-send" in c for c in phone.host_log)
+
+
+async def test_waits_for_phone_plugged_in_later(df_home: Path, monkeypatch) -> None:
+    """No phone at start -> the TUI keeps looking and connects once it appears (no restart needed)."""
+    from droidforge.session import ConnectError, open_session
+    from droidforge.tui import app as app_mod
+    calls = []
+
+    def flaky(**kw):
+        calls.append(1)
+        if len(calls) < 3:
+            raise ConnectError("no device - plug in USB")
+        return open_session(**kw)
+    monkeypatch.setattr(app_mod, "open_session", flaky)
+    app = DroidforgeApp(simulate=True, show_limits=False)
+    app.RETRY_S = 0.05
+    async with app.run_test(size=SIZE) as pilot:
+        for _ in range(100):
+            await pilot.pause(0.05)
+            if app.session is not None:
+                break
+        assert app.session is not None and len(calls) == 3
+        log = app.query_one(LogPane)
+        assert sum("no device" in str(line) for line in log.lines) == 1
