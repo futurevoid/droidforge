@@ -34,8 +34,12 @@ the health gate is not done.
   IMEs refused). Accept: `tests/test_guard.py` parses COMMANDS.md - every write row has a pattern and every
   pattern has a row; every Forbidden row is refused (incl. `app_process`, `system_locales`, `CHANGE_CONFIGURATION`,
   `cmd overlay`, `pm clear` on system apps); a made-up command is refused.
-- [ ] **P1.2** (P10, R-11.8) `engine/snapshot.py`: take/diff of settings, package states, app locales, IME,
+- [x] **P1.2** (P10, R-11.8) `engine/snapshot.py`: take/diff of settings, package states, app locales, IME,
   launcher, global-config fields. Accept: diff on sim finds exactly the injected changes, nothing else.
+  - Open question (owner): a real phone changes some settings on its own (auto-brightness `screen_brightness`,
+    `next_alarm_formatted`, ...). P10 as written flags every undeclared change, so these would stop a plan on a
+    real device. Implemented strictly for now (no ignore-list). Phase 9 will show which keys are noisy - may
+    droidforge then keep a reviewed ignore-list of volatile keys (never containing P9b display/UI keys)?
 - [ ] **P1.3** (P0, P11, R-11.7) `engine/health.py`: probes + baseline compare. Accept: `break_ui()` on the sim is
   reported as 2+ regressions; a healthy sim reports none; sim `permission_monitoring=True` is reported with the
   "turn it off" message even when the baseline already had it on.
