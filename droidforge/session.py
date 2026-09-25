@@ -45,9 +45,19 @@ def pick_serial(rows: List[Tuple[str, str]], wanted: Optional[str]) -> str:
         return ready[0]
     if len(ready) > 1:
         raise ConnectError(f"several devices connected - pick one with --serial: {', '.join(ready)}")
-    if any(st == "unauthorized" for _, st in rows):
-        raise ConnectError("the phone shows as unauthorized - accept the 'Allow USB debugging' prompt on screen")
-    raise ConnectError("no device - plug in USB and enable Developer options > USB debugging")
+    states = " ".join(st for _, st in rows)
+    if "unauthorized" in states or "authorizing" in states:
+        raise ConnectError("the phone shows as unauthorized - unlock it and accept the 'Allow USB debugging' prompt "
+                           "on screen (tick 'Always allow')")
+    if "no permissions" in states:
+        raise ConnectError("adb sees the phone but this user may not open it (udev rules). Arch: sudo pacman -S "
+                           "android-udev, then log out and in, and replug the cable")
+    if "offline" in states:
+        raise ConnectError("the phone shows as offline - unplug and replug the cable, and unlock the phone")
+    if rows:
+        raise ConnectError(f"the phone is not ready ({states}) - replug the cable and unlock the phone")
+    raise ConnectError("no device - plug in USB, enable Developer options > USB debugging, unlock the phone; if it "
+                       "still does not show, pick 'File transfer' in the USB notification or try another cable")
 
 
 def open_session(simulate: bool = False, serial: Optional[str] = None, expert: bool = False,
