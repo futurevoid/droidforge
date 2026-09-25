@@ -910,7 +910,11 @@ class SimBackend:
             "      runtime permissions:\n"
             f"{perms}\n"
             "      disabledComponents:\n"
-            "      enabledComponents:"
+            "      enabledComponents:\n"
+            "Activity Resolver Table:\n  Non-Data Actions:\n"
+            + "".join(f"      android.intent.action.MAIN:\n        5c3f{n:03d} {name}/{a} filter 9a{n:03d}\n"
+                      for n, a in enumerate(p.activities))
+            + "      "
         )
 
 

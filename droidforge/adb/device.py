@@ -115,6 +115,16 @@ class Device:
         finally:
             self.invalidate("device changed")
 
+    def manual(self, cmd: str, timeout: float = 60) -> RunResult:
+        """The user's own shell line (R-9.4) - engine/executor.run_manual only. Outside the allowlist by design,
+        but Forbidden commands are still refused."""
+        from droidforge.engine import guard
+        guard.check_forbidden(cmd)
+        try:
+            return self.adb(["shell", cmd], timeout=timeout, plumbing=False)
+        finally:
+            self.invalidate("manual shell line")
+
     def state(self) -> str:
         r = self.adb(["get-state"], timeout=10, plumbing=True)
         return r.out.strip() if r.ok else "offline"

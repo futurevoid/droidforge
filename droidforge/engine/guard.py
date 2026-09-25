@@ -281,6 +281,13 @@ def _forbidden(cmd: str) -> None:
             raise GuardError(cmd, f"forbidden: {why}", forbidden=True)
 
 
+def check_forbidden(cmd: str) -> None:
+    """Forbidden patterns only (the manual shell pane, R-9.4: outside the allowlist, never outside Forbidden)."""
+    if not isinstance(cmd, str) or not cmd.strip() or any(c in cmd for c in "\r\x00"):
+        raise GuardError(str(cmd), "malformed command")
+    _forbidden(cmd)
+
+
 def _find(cmd: str, host: bool) -> Tuple[Rule, "re.Match[str]"]:
     for rule in RULES:
         if rule.host != host:

@@ -87,7 +87,7 @@ def test_only_executor_calls_device_sh() -> None:
     for path in MODULES:
         if path in WRITE_PATH_OWNERS:
             continue
-        for name, line in _calls(path, {"sh", "run_host"}):
+        for name, line in _calls(path, {"sh", "run_host", "manual"}):
             raise AssertionError(f"{path}:{line} calls {name}() - writes go through engine/executor.py")
 
 

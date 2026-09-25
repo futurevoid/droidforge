@@ -313,3 +313,45 @@ def _effects(results: Sequence[StepResult], changes: Sequence[Change]) -> None:
             r.effect = "changed"
         else:
             r.effect = "unchanged"
+
+
+# ---------------------------------------------------------------------- manual shell pane (R-9.4)
+WRITE_LOOKING = re.compile(r"\b(put|disable|disable-user|uninstall|grant|revoke|set|clear|rm|delete|suspend|"
+                           r"reboot|setprop|kill|install|enable)\b")
+
+
+@dataclass
+class ManualResult:
+    cmd: str
+    needs_confirm: bool = False
+    result: Optional[RunResult] = None
+    refused: str = ""
+    regressions: List[Regression] = field(default_factory=list)
+    history_id: Optional[str] = None
+
+
+def run_manual(cmd: str, device: "Device", history: Optional["History"] = None, confirmed: bool = False
+               ) -> ManualResult:
+    """One line of the user's shell pane. Write-looking lines need `confirmed` (second Enter), get a before /
+    after health check, and are recorded as 'manual - no automatic undo'. Forbidden commands are refused."""
+    cmd = cmd.strip()
+    res = ManualResult(cmd)
+    try:
+        guard.check_forbidden(cmd)
+    except guard.GuardError as e:
+        res.refused = e.reason
+        return res
+    writes = bool(WRITE_LOOKING.search(cmd))
+    if writes and not confirmed:
+        res.needs_confirm = True
+        return res
+    base = health.run(device) if writes else None
+    res.result = device.manual(cmd)
+    if base is not None:
+        res.regressions = health.compare(base, health.run(device))
+    if writes and history is not None:
+        step = Step(label="manual - no automatic undo", cmd=cmd, category="manual")
+        res.history_id = history.record(Plan(title="Shell pane"), StepResult(
+            step=step, requested=step, ok=res.result.ok, exit=res.result.exit, out=res.result.out,
+            err=res.result.err), device)
+    return res

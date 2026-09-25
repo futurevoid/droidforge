@@ -394,7 +394,19 @@ def sc_scrcpy_install(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return scrcpy.install_plan(dev)
 
 
+def sc_curated(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features.tools import activities
+    return activities.curated_plan(dev, "developer")
+
+
+def sc_launch(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features.tools import activities
+    return activities.launch_plan(dev, "com.android.phone/.settings.RadioInfo")
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.tools.activities.curated_plan": sc_curated,
+    "droidforge.features.tools.activities.launch_plan": sc_launch,
     "droidforge.features.tools.scrcpy.install_plan": sc_scrcpy_install,
     "droidforge.features.shizuku.start_plan": sc_shizuku_start,
     "droidforge.features.shizuku.install_plan": sc_shizuku_install,

@@ -135,7 +135,7 @@ the health gate is not done.
 - [x] **P5.2** `features/shizuku.py` install from GitHub release + auto-start on connect + status (R-2.3).
   - "Auto-start on every connect" is done as an ASK on every connect (P14 overrides: nothing runs unconfirmed).
 - [x] **P5.3** `tools/scrcpy.py` (R-9.1) with pacman hint. **P5.4** `tools/logcat.py` streaming pane (R-9.2).
-- [ ] **P5.5** `tools/activities.py` curated intents + exported-activity browser (R-9.3).
+- [x] **P5.5** `tools/activities.py` curated intents + exported-activity browser (R-9.3).
   **P5.6** `tools/shell.py` pane (R-9.4).
 
 ## Phase 6 - Audit
