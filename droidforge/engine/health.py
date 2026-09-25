@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from droidforge.adb import parse
-from droidforge.data.device_keys import PERMISSION_MONITORING_KEY, PERMISSION_MONITORING_NS
+from droidforge.data.device_keys import PERMISSION_MONITORING_PROP
 from droidforge.engine.snapshot import CONFIG_CMD, HOME_CMD, covered
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -23,7 +23,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 SETTINGS_CMD = "cmd package resolve-activity --brief -a android.settings.SETTINGS"
 PERMS_CMD = "cmd package resolve-activity --brief -a android.intent.action.MANAGE_APP_PERMISSIONS"
-PM_SWITCH_CMD = f"settings get {PERMISSION_MONITORING_NS} {PERMISSION_MONITORING_KEY}"
+PM_SWITCH_CMD = f"getprop {PERMISSION_MONITORING_PROP}"
 DEV_OPTIONS_CMD = "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS"
 WATCHED_PROCS = ("com.android.systemui", "com.android.settings")
 
@@ -152,13 +152,13 @@ def run(device: "Device") -> HealthReport:
     h.add("crashes", ",".join(f"{p}={n}" for p, n in counts.items()))
 
     sw = device.out(PM_SWITCH_CMD).strip()
-    if sw == "1":
+    if sw == "false":  # permission monitoring disabled = the switch is on
         h.add("permission_monitoring", "on", False, PERMISSION_MONITORING_ALERT)
-    elif sw == "0":
+    elif sw == "true":
         h.add("permission_monitoring", "off", True)
     else:
         h.add("permission_monitoring", "unknown", None,
-              "the setting behind the switch is recorded in Phase 9; check Developer options by hand")
+              f"{PERMISSION_MONITORING_PROP} is not set on this ROM; check Developer options by hand")
     device.log.trace("health: " + ", ".join(f"{p.name}={p.value}{'' if p.ok is not False else ' (FAIL)'}"
                                             for p in h.probes.values()), 3)
     return h
@@ -206,7 +206,7 @@ def compare(baseline: HealthReport, now: HealthReport, declared: Iterable[str] =
 # snapshot key <-> probe (for recoveries seen by the blast-radius diff)
 PROBE_KEYS = {"font_scale": "setting:system:font_scale", "night": "setting:secure:ui_night_mode",
               "ime": "setting:secure:default_input_method", "launcher": "launcher",
-              "permission_monitoring": f"setting:{PERMISSION_MONITORING_NS}:{PERMISSION_MONITORING_KEY}"}
+              "permission_monitoring": f"prop:{PERMISSION_MONITORING_PROP}"}
 
 
 def recovered_keys(baseline: HealthReport, now: HealthReport, reference: Optional[HealthReport] = None) -> List[str]:

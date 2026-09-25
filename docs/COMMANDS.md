@@ -169,7 +169,7 @@ Nothing here. All display/UI commands moved to "Forbidden".
 | Crashes | `logcat -b crash -d -t 200` | L |
 | Boot completed (R-11.9) | `getprop sys.boot_completed` -> `1` once the phone has finished booting | S (AOSP) |
 | Process alive | `pidof com.android.systemui`, `pidof com.android.settings` | L |
-| Permission-monitoring switch off | read the setting/prop behind Developer options > "Disable permission monitoring" (key unknown yet: found in Phase 9 by the owner flipping it while droidforge diffs `settings list system/secure/global` + `getprop`; droidforge only reads). Until then the simulator exposes it as the placeholder `settings get global droidforge_placeholder_permission_monitoring_disabled` (`1` = switch on); on a real phone that read returns `null` and the probe reports "unknown", never "healthy" | V |
+| Permission-monitoring switch off | `getprop persist.sys.permission.enable`: `true` = switch off (healthy), `false` = switch on, empty = not on this ROM ("unknown", never "healthy"). Recorded 2026-09-25 by the owner on the Neo 8 (RMX8899, Android 16): flipping the switch changed only this property; Settings then loads stock-Android fragments (e.g. `DisplaySettings` instead of `com.oplus.settings.feature.display.DisplaySettingsFragment`) on every entry point. droidforge only reads it; `setprop` on it is Forbidden | S (owner diff) |
 | Open Developer options (for the user to turn the switch off) | `am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS` | S |
 
 ## Forbidden (P9) - never implement, never add to the allowlist

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from droidforge.adb.sim import IME_GBOARD, FakePhone
-from droidforge.data.device_keys import PERMISSION_MONITORING_KEY
+from droidforge.data.device_keys import PERMISSION_MONITORING_PROP
 from droidforge.engine import guard, health
 
 
@@ -45,7 +45,7 @@ def test_permission_monitoring_reported_even_if_baseline_had_it_on(sim, phone: F
 
 
 def test_permission_monitoring_unknown_on_real_phone(sim, phone: FakePhone) -> None:
-    del phone.settings["global"][PERMISSION_MONITORING_KEY]  # a real phone: `settings get` -> null
+    del phone.props[PERMISSION_MONITORING_PROP]  # a ROM without the property: `getprop` -> empty
     h = health.run(sim)
     assert h.get("permission_monitoring").value == "unknown" and h.get("permission_monitoring").ok is None
     assert health.compare(h, health.run(sim)) == []

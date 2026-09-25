@@ -169,4 +169,6 @@ and adds `tests/data/neo8_cn_packages.txt` (from `pm list packages -f -u`) to re
   droidforge confirms the key flipped back. droidforge itself only reads. Record the key in COMMANDS.md.
 - Before any write in the checklist: `droidforge doctor` saves the healthy baseline (health probes + settings
   snapshot) so every later step is compared against the phone as it is now (after "Reset all settings").
+- Recorded early (owner diff, 2026-09-25): the switch is `persist.sys.permission.enable` (`true` -> `false`); the
+  health probe, snapshot and guard use it. No other setting, flag, overlay or component changes with it.
 - [ ] **P9.1** Checklist written. - [ ] **P9.2** Neo 8 results applied. - [ ] **P9.3** realme 10 results applied.

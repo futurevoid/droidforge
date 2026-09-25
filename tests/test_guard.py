@@ -9,7 +9,7 @@ from typing import Dict, List, Set, Tuple
 
 import pytest
 
-from droidforge.adb.sim import IME_GBOARD, IME_SOGOU, PERMISSION_MONITORING_KEY, SIM_SERIAL
+from droidforge.adb.sim import IME_GBOARD, IME_SOGOU, PERMISSION_MONITORING_PROP, SIM_SERIAL
 from droidforge.engine import guard
 from droidforge.engine.guard import GuardError
 
@@ -196,8 +196,8 @@ def forbidden_candidates(cell: str) -> List[str]:
 
 
 EXTRA_FORBIDDEN = [
-    f"settings put global {PERMISSION_MONITORING_KEY} 1",
-    f"settings put global {PERMISSION_MONITORING_KEY} 0",
+    f"setprop {PERMISSION_MONITORING_PROP} false",
+    f"setprop {PERMISSION_MONITORING_PROP} true",
     "settings put global development_settings_enabled 0",
     "settings put global adb_enabled 1",
     "settings put secure oplus_permission_monitor_disabled 1",

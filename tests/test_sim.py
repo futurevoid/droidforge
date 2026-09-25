@@ -12,7 +12,7 @@ from droidforge.adb.sim import (
     COLOROS_SETTINGS,
     IME_GBOARD,
     IME_SOGOU,
-    PERMISSION_MONITORING_KEY,
+    PERMISSION_MONITORING_PROP,
     SIM_SERIAL,
     FakePhone,
     SimBackend,
@@ -163,7 +163,7 @@ def probes(raw_sim) -> dict:
         "settings": last_component(raw_sim.out(f"{SH} android.settings.SETTINGS")),
         "perms": last_component(raw_sim.out(f"{SH} android.intent.action.MANAGE_APP_PERMISSIONS")),
         "config": raw_sim.out("dumpsys activity | grep -m1 mGlobalConfig"),
-        "pm": raw_sim.out(f"settings get global {PERMISSION_MONITORING_KEY}"),
+        "pm": raw_sim.out(f"getprop {PERMISSION_MONITORING_PROP}"),
         "home": last_component(raw_sim.out(f"{SH} android.intent.action.MAIN -c android.intent.category.HOME")),
         "crash": raw_sim.out("logcat -b crash -d -t 200"),
         "sysui": raw_sim.read("pidof com.android.systemui").ok,
@@ -174,7 +174,7 @@ def test_healthy_probes(raw_sim) -> None:
     p = probes(raw_sim)
     assert p["settings"] == COLOROS_SETTINGS and p["perms"] == COLOROS_PERMS
     assert re.search(r"mMaterialColor=17179869184", p["config"]) and "480dpi" in p["config"]
-    assert p["pm"] == "0" and p["home"].startswith("com.android.launcher/") and p["crash"] == "" and p["sysui"]
+    assert p["pm"] == "true" and p["home"].startswith("com.android.launcher/") and p["crash"] == "" and p["sysui"]
     assert "font_scale=1.0" in raw_sim.out("settings list system")
 
 
@@ -183,7 +183,7 @@ def test_break_ui_visible_through_probes(raw_sim, phone: FakePhone) -> None:
     phone.crash("com.android.settings")
     p = probes(raw_sim)
     assert p["settings"] == AOSP_SETTINGS and p["perms"] == AOSP_PERMS
-    assert "mMaterialColor=0" in p["config"] and p["pm"] == "1"
+    assert "mMaterialColor=0" in p["config"] and p["pm"] == "false"
     assert "Process: com.android.settings" in p["crash"]
 
 
