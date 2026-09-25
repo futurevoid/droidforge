@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 - 2026-09-25
+
+- App names next to package names (plan preview, debloat list, keep-alive / firewall pickers, CLI keep-alive
+  picker): read from each app's own APK (English first), cached per APK version, so the right app is picked.
+- Keep-alive also sets RUN_IN_BACKGROUND, the Android 13+ restriction level `exempted` and the Android 14+
+  power-restriction exemption per app. New opt-in phone-wide plan `keepalive --child-processes` (Developer option
+  "Disable child process restrictions" + phantom cap), undoable on its own. Every CLI plan prints its own undo
+  command and recovery script.
+- The "Disable permission monitoring" health probe reads `persist.sys.permission.enable` (confirmed on the Neo 8).
+
 ## 1.0.2 - 2026-09-25
 
 - TUI keeps looking for the phone when none is connected at start: plugging in USB or accepting the

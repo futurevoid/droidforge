@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Set
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, SelectionList
@@ -22,6 +23,7 @@ class AppPicker(Vertical):
         super().__init__(id=id)
         self.pkgs: List[str] = []
         self.status: Dict[str, str] = {}
+        self.names: Dict[str, str] = {}
         self.chosen: Set[str] = set()
         self.filter_text = ""
         self._redrawing = False
@@ -30,9 +32,11 @@ class AppPicker(Vertical):
         yield Input(placeholder="search apps", classes="app-search")
         yield SelectionList[str]()
 
-    def load(self, pkgs: List[str], status: Optional[Dict[str, str]] = None) -> None:
+    def load(self, pkgs: List[str], status: Optional[Dict[str, str]] = None,
+             names: Optional[Dict[str, str]] = None) -> None:
         self.pkgs = list(pkgs)
         self.status = dict(status or {})
+        self.names = dict(names or {})
         self.chosen &= set(self.pkgs)
         self._redraw()
 
@@ -42,10 +46,20 @@ class AppPicker(Vertical):
         self._redrawing = True
         try:
             sl.clear_options()
-            sl.add_options([(p + (f"   [{self.status[p]}]" if self.status.get(p) else ""), p, p in self.chosen)
-                            for p in self.pkgs if not f or f in p.lower()])
+            sl.add_options([(self._prompt(p), p, p in self.chosen) for p in self.pkgs
+                            if not f or f in p.lower() or f in self.names.get(p, "").lower()])
         finally:
             self.call_after_refresh(self._done_redrawing)
+
+    def _prompt(self, p: str) -> Text:
+        t = Text()
+        if self.names.get(p):
+            t.append(self.names[p], style="bold")
+            t.append("  ")
+        t.append(p, style="dim" if self.names.get(p) else "")
+        if self.status.get(p):
+            t.append(f"   [{self.status[p]}]")
+        return t
 
     def _done_redrawing(self) -> None:
         self._redrawing = False

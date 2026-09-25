@@ -17,15 +17,21 @@ def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
     cmds = [s.cmd for s in plan.steps]
     assert cmds == ["dumpsys deviceidle whitelist +com.whatsapp",
                     "cmd appops set com.whatsapp RUN_ANY_IN_BACKGROUND allow",
+                    "cmd appops set com.whatsapp RUN_IN_BACKGROUND allow",
+                    "cmd appops set com.whatsapp SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS allow",
                     "am set-standby-bucket com.whatsapp active",
+                    "am set-bg-restriction-level --user 0 com.whatsapp exempted",
                     "am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.whatsapp"]
-    assert plan.steps[2].undo == ["am set-standby-bucket com.whatsapp frequent"]
+    assert plan.steps[4].undo == ["am set-standby-bucket com.whatsapp frequent"]
+    assert plan.steps[5].undo == ["am set-bg-restriction-level --user 0 com.whatsapp adaptive_bucket"]
     assert any("Developer-options" in n for n in plan.notes)
     rep = executor.run(plan, sim, yes, profile=prof, history=h)
     assert rep.status == "done"
     assert "com.whatsapp" in phone.deviceidle and phone.standby["com.whatsapp"] == 10
     assert prof.keepalive == ["com.whatsapp"] and phone.started[-1] == "app-info package:com.whatsapp"
     assert keepalive.status(sim, "com.whatsapp") == {"whitelist": "user", "background": "allow", "bucket": "active"}
+    assert phone.bg_level["com.whatsapp"] == "exempted"
+    assert all(r.effect == "changed" for r in rep.results if r.requested.risk != "read")
     executor.run(h.rollback_to(h.entries()[0].id), sim, yes, profile=prof, history=h)
     assert phone.state() == initial and prof.keepalive == []
 
@@ -34,6 +40,47 @@ def test_keepalive_skips_what_is_already_set(sim, phone: FakePhone) -> None:
     executor.run(keepalive.keepalive_plan(sim, ["com.whatsapp"]), sim, yes)
     again = keepalive.keepalive_plan(sim, ["com.whatsapp"])
     assert [s.risk for s in again.steps] == ["read"]
+
+
+def test_child_processes_is_its_own_plan_and_undoes_alone(sim, phone: FakePhone, capsys) -> None:
+    initial = phone.clone().state()
+    h = History(phone.serial)
+    executor.run(keepalive.keepalive_plan(sim, ["com.whatsapp"]), sim, yes, history=h)
+    after_apps = phone.clone().state()
+    plan = keepalive.child_process_plan(sim)
+    assert [s.cmd for s in plan.steps] == [
+        "settings put global settings_enable_monitor_phantom_procs false",
+        "device_config put activity_manager max_phantom_processes 2147483647"]
+    assert [s.undo for s in plan.steps] == [["settings delete global settings_enable_monitor_phantom_procs"],
+                                            ["device_config delete activity_manager max_phantom_processes"]]
+    assert all(s.risk == "risky" and s.pkg is None for s in plan.steps)
+    rep = executor.run(plan, sim, yes, history=h)
+    assert rep.status == "done" and all(r.effect == "changed" for r in rep.results)
+    assert phone.settings["global"]["settings_enable_monitor_phantom_procs"] == "false"
+    ids = [r.history_id for r in rep.results]
+    executor.run(h.undo(ids), sim, yes, history=h)          # only this plan: the per-app keep-alive stays
+    assert phone.state() == after_apps and phone.state() != initial
+    assert keepalive.child_process_plan(sim).steps       # offered again after the undo
+
+
+def test_child_processes_keeps_existing_values_for_undo(sim, phone: FakePhone) -> None:
+    phone.settings["global"]["settings_enable_monitor_phantom_procs"] = "true"
+    phone.device_config["activity_manager"]["max_phantom_processes"] = "32"
+    plan = keepalive.child_process_plan(sim)
+    assert [s.undo for s in plan.steps] == [["settings put global settings_enable_monitor_phantom_procs true"],
+                                            ["device_config put activity_manager max_phantom_processes 32"]]
+
+
+def test_cli_child_processes_prints_its_own_undo(monkeypatch, capsys, df_home) -> None:
+    from droidforge import cli
+    from droidforge.adb.sim import neo8_cn
+    from droidforge.session import open_session
+    ph = neo8_cn()
+    monkeypatch.setattr(cli, "SESSION_FACTORY", lambda **kw: open_session(phone=ph, **kw))
+    assert cli.main(["-q", "--simulate", "--yes", "keepalive", "--child-processes"]) == 0
+    out = capsys.readouterr().out
+    assert "Undo just this plan: droidforge undo " in out and "Recovery script" in out and out.isascii()
+    assert ph.device_config["activity_manager"]["max_phantom_processes"] == "2147483647"
 
 
 def test_keepalive_locked_needs_expert(sim) -> None:

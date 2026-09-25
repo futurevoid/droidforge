@@ -342,6 +342,11 @@ def sc_keepalive(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return keepalive.keepalive_plan(dev, ["com.whatsapp", "org.telegram.messenger"])
 
 
+def sc_child_processes(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keepalive
+    return keepalive.child_process_plan(dev)
+
+
 def sc_keepalive_remove(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     from droidforge.features import keepalive
     phone.deviceidle.add("com.whatsapp")
@@ -441,6 +446,7 @@ SCENARIOS: Dict[str, Scenario] = {
     "droidforge.features.region.datetime_plan": sc_datetime,
     "droidforge.features.keepalive.keepalive_plan": sc_keepalive,
     "droidforge.features.keepalive.remove_plan": sc_keepalive_remove,
+    "droidforge.features.keepalive.child_process_plan": sc_child_processes,
     "droidforge.features.powerperms.grant_plan": sc_powerperms,
     "droidforge.features.powerperms.preset_plan": sc_powerperms_preset,
     "droidforge.features.defaults.swap_plan": sc_swap,

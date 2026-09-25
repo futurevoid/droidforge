@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Protocol, Sequence, Tuple, Union
 
+from droidforge.adb import labels
 from droidforge.adb.backend import RunResult
 from droidforge.adb.hostcmd import run_host
 from droidforge.engine import guard, health, recovery, safety, snapshot, undo
@@ -35,7 +36,7 @@ ERR_RE = re.compile(r"(?i)\b(error|exception|failure|unknown package|not install
 BOOT_POLL_S = 2.0
 BOOT_FAIL = "the phone did not come back after the reboot"
 OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:", "fw:", "role:",
-              "deviceidle:", "standby:")
+              "deviceidle:", "standby:", "bgrestrict:", "devcfg:", "prop:")
 UNOBSERVABLE = ("fw:chain3",)   # no getter for the chain switch
 
 ConfirmHook = Callable[[Plan], Union[bool, Confirmation]]
@@ -128,7 +129,9 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         log.error(f"Plan refused by the guard: {e.reason} ({e.cmd})")
         return rep
 
-    # 2. confirm (P1)
+    # 2. confirm (P1) - with each package's app name next to it, so the right app is picked
+    if plan.packages() and not plan.names:
+        plan.names.update(labels.lookup(device, plan.packages()))
     ok, why = _typed_ok(plan, confirm(plan))
     if not ok:
         rep.status, rep.error = ("cancelled", "") if why == "cancelled" else ("refused", why)

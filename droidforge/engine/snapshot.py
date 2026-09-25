@@ -37,6 +37,8 @@ NAMESPACES = ("system", "secure", "global")
 HOME_CMD = "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 CONFIG_CMD = "dumpsys activity | grep -m1 mGlobalConfig"
 WATCHED_PROPS = (PERMISSION_MONITORING_PROP,)
+# phone-wide keep-alive key (owner opt-in): the blast-radius diff must see it
+WATCHED_DEVCFG = (("activity_manager", "max_phantom_processes"),)
 ROLES = ("android.app.role.BROWSER", "android.app.role.SMS", "android.app.role.DIALER")
 
 
@@ -54,6 +56,7 @@ class Snapshot:
     launcher: str = ""
     config: Dict[str, str] = field(default_factory=dict)
     props: Dict[str, str] = field(default_factory=dict)                 # WATCHED_PROPS
+    devcfg: Dict[str, str] = field(default_factory=dict)                # WATCHED_DEVCFG ("ns/key" -> value)
 
     # ------------------------------------------------------------------ flatten
     def flat(self) -> Dict[str, str]:
@@ -75,6 +78,8 @@ class Snapshot:
             if "deviceidle" in d:
                 f[f"deviceidle:{p}"] = d["deviceidle"]
                 f[f"standby:{p}"] = d.get("standby", "")
+            if d.get("bgrestrict"):
+                f[f"bgrestrict:{p}"] = d["bgrestrict"]
         for p, loc in self.app_locales.items():
             f[f"applocale:{p}"] = loc
         for i in self.imes:
@@ -86,6 +91,9 @@ class Snapshot:
             f[f"config:{k}"] = v
         for k, v in self.props.items():
             f[f"prop:{k}"] = v
+        for k, v in self.devcfg.items():
+            ns, key = k.split("/", 1)
+            f[f"devcfg:{ns}:{key}"] = v
         return f
 
     # ------------------------------------------------------------------ persistence
@@ -149,6 +157,9 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
                         "appops": parse.appops(device.read(f"cmd appops get {p}").out)}
         s.details[p]["deviceidle"] = idle.get(p, "")
         s.details[p]["standby"] = parse.standby_bucket(device.out(f"am get-standby-bucket {p}"))
+        if device.sdk >= 33:
+            lvl = device.read(f"am get-bg-restriction-level --user 0 {p}")
+            s.details[p]["bgrestrict"] = lvl.out.strip() if lvl.ok else ""
         if fw:
             v = device.out(f"cmd connectivity get-package-networking-enabled {p}")
             if v in ("true", "false"):
@@ -164,6 +175,7 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
     s.launcher = parse.last_component(device.read(HOME_CMD).out)
     s.config = parse.global_config(device.read(CONFIG_CMD).out)
     s.props = {p: device.out(f"getprop {p}").strip() for p in WATCHED_PROPS}
+    s.devcfg = {f"{ns}/{k}": device.out(f"device_config get {ns} {k}").strip() for ns, k in WATCHED_DEVCFG}
     device.log.trace(f"snapshot: {sum(len(t) for t in s.settings.values())} settings, {len(s.packages)} packages, "
                      f"{len(s.details)} detailed, {len(s.app_locales)} app locales, {len(s.imes)} IMEs")
     return s
@@ -176,7 +188,7 @@ def diff(before: Snapshot, after: Snapshot) -> List[Change]:
     both = set(before.details) & set(after.details)
     changes = []
     for k in sorted(set(a) | set(b)):
-        if k.startswith(("perm:", "appop:", "fw:", "deviceidle:", "standby:")) or k.endswith(":suspended"):
+        if k.startswith(("perm:", "appop:", "fw:", "deviceidle:", "standby:", "bgrestrict:")) or k.endswith(":suspended"):
             if k.split(":")[1] not in both:
                 continue
         if k.startswith("applocale:") and (k not in a or k not in b):

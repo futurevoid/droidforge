@@ -96,7 +96,10 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     w.add_argument("--disable-coloros", action="store_true")
     k = sub.add_parser("keepalive", help="keep picked apps alive in the background (no names: pick from a list)")
     k.add_argument("packages", nargs="*")
-    k.add_argument("--remove", action="store_true")
+    kx = k.add_mutually_exclusive_group()
+    kx.add_argument("--remove", action="store_true")
+    kx.add_argument("--child-processes", action="store_true",
+                    help="phone-wide, own plan: 'Disable child process restrictions' + unlimited phantom processes")
     pp = sub.add_parser("powerperms", help="grant power permissions")
     pp.add_argument("--preset", nargs="*", default=[])
     pp.add_argument("--app")
@@ -139,7 +142,8 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
 def preview_lines(plan: Plan) -> List[str]:
     out = [f"Plan: {plan.title}  ({len(plan.steps)} step(s), {len(plan.batches())} batch(es))"]
     for i, st in enumerate(plan.steps, 1):
-        out.append(f" {i:>2}. [{st.risk.upper()}] {st.label}")
+        name = plan.names.get(st.pkg or "")
+        out.append(f" {i:>2}. [{st.risk.upper()}] {st.label}" + (f'  -- app: "{name}"' if name else ""))
         out.append(f"       {'host' if st.host else 'adb shell'}: {st.cmd}")
         out += [f"       undo: {u}" for u in st.undo]
         out += [f"       then if refused: {fb.cmd}" for fb in st.fallbacks]
@@ -259,6 +263,8 @@ def build_plan(args: argparse.Namespace, s: Session) -> Optional[Plan]:
         return apps.install_plan(dev, [Path(a) for a in args.apks])
     if c == "swap":
         return defaults.swap_plan(dev, args.function, args.disable_coloros, data, ex)
+    if c == "keepalive" and args.child_processes:
+        return keepalive.child_process_plan(dev)
     if c == "keepalive":
         pkgs = args.packages or pick_keepalive(dev, args.remove)
         if not pkgs:
@@ -308,9 +314,11 @@ def pick_keepalive(dev: "Device", remove: bool, ask: Optional[Callable[[str], st
     if not items:
         print("No apps to pick." if not remove else "No app is kept alive by droidforge.")
         return []
+    from droidforge.adb import labels
+    names = labels.lookup(dev, items)
     w = len(str(len(items)))
     for n, p in enumerate(items, 1):
-        print(ascii_safe(f" {n:>{w}}) {p:<48} {('[' + st[p] + ']') if st.get(p) else ''}"))
+        print(ascii_safe(f" {n:>{w}}) {names.get(p, ''):<24.24} {p:<44} {('[' + st[p] + ']') if st.get(p) else ''}"))
     try:
         text = (ask or input)("Pick apps (e.g. 1,4,7 or 2-9; Enter = cancel): ")
     except EOFError:
@@ -347,6 +355,11 @@ def run_cli_plan(s: Session, plan: Plan, yes: bool, allow_locked: Sequence[str] 
     if refused:
         print(ascii_safe("The ROM refused to disable: " + ", ".join(p for p in refused if p)
                          + ". Try: droidforge debloat force <package> (suspend -> remove -> firewall + neuter)."))
+    ids = [r.history_id for r in rep.results if r.history_id and r.ok and not r.dry_run]
+    if ids:
+        print(f"Undo just this plan: droidforge undo {' '.join(ids)}")
+    if rep.recovery:
+        print(ascii_safe(f"Recovery script (runs the undo from any shell with adb): {rep.recovery}"))
     if rep.offer_reboot:
         print("This was a risky plan: reboot the phone and run 'droidforge doctor' to re-check (R-11.9).")
     return 0

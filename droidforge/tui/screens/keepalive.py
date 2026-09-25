@@ -8,6 +8,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Checkbox, Label, Static
 
+from droidforge.adb import labels
 from droidforge.data.presets import CATALOG
 from droidforge.features import keepalive, powerperms, region
 from droidforge.tui.screens.base import Section
@@ -25,6 +26,9 @@ class KeepAliveSection(Section):
         with Horizontal(classes="buttons"):
             yield Button("Keep picked apps alive", id="ka-on", variant="primary")
             yield Button("Stop keeping alive", id="ka-off")
+        yield Label("Phone-wide, off by default - its own plan, undo it alone in History", classes="subtitle")
+        with Horizontal(classes="buttons"):
+            yield Button("Allow child processes (Disable child process restrictions)", id="ka-child")
         yield Label("Power permissions for the picked app", classes="subtitle")
         with Horizontal(classes="buttons"):
             for name in powerperms.PERMS:
@@ -40,14 +44,15 @@ class KeepAliveSection(Section):
     def refresh_from(self, app: "DroidforgeApp") -> None:
         dev = self.device
         if dev is not None:
-            def read() -> Tuple[List[str], Dict[str, str], List[str]]:
+            def read() -> Tuple[List[str], Dict[str, str], List[str], Dict[str, str]]:
                 pkgs = keepalive.candidates(dev)
-                return pkgs, keepalive.statuses(dev, pkgs), powerperms.installed_presets(dev)
+                return (pkgs, keepalive.statuses(dev, pkgs), powerperms.installed_presets(dev),
+                        labels.lookup(dev, pkgs))
             app.background(read, self.show)
 
-    def show(self, res: Tuple[List[str], Dict[str, str], List[str]]) -> None:
-        pkgs, status, presets = res
-        self.query_one(AppPicker).load(pkgs, status)
+    def show(self, res: Tuple[List[str], Dict[str, str], List[str], Dict[str, str]]) -> None:
+        pkgs, status, presets, names = res
+        self.query_one(AppPicker).load(pkgs, status, names)
         self.presets = presets
         self.query_one("#pp-presets-btn", Button).label = (
             "Grant presets: " + ", ".join(CATALOG[k].name for k in presets)) if presets else "No preset apps installed"
@@ -61,6 +66,8 @@ class KeepAliveSection(Section):
         if bid == "ka-on":
             app.run_plan(lambda: keepalive.keepalive_plan(dev, picked, None, app.expert),
                          on_done=lambda rep: self.refresh_from(app))
+        elif bid == "ka-child":
+            app.run_plan(lambda: keepalive.child_process_plan(dev))
         elif bid == "ka-off":
             app.run_plan(lambda: keepalive.remove_plan(dev, picked), on_done=lambda rep: self.refresh_from(app))
         elif bid == "pp-grant":

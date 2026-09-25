@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Sequence
 
-from droidforge.adb import parse
+from droidforge.adb import labels, parse
 from droidforge.data import uad as uadmod
 from droidforge.engine import safety, steps
 from droidforge.engine.plan import Plan, Step, StepResult
@@ -41,6 +41,7 @@ class Row:
     tier: str
     description: str
     verdict: Verdict
+    name: str = ""          # app name shown in Settings (adb/labels.py)
 
 
 def statuses(device: "Device", suspended: Iterable[str] = ()) -> Dict[str, str]:
@@ -62,8 +63,10 @@ def statuses(device: "Device", suspended: Iterable[str] = ()) -> Dict[str, str]:
 def _rows(device: "Device", pkgs: Iterable[str], uad: Uad, suspended: Iterable[str]) -> List[Row]:
     st = statuses(device, suspended)
     ctx = SafetyContext.from_device(device, uad)
+    pkgs = list(pkgs)
+    names = labels.lookup(device, pkgs)
     return [Row(p, st.get(p, "absent"), uadmod.tier(dict(uad), p), uadmod.description(dict(uad), p, 70),
-                safety.verdict(p, ctx)) for p in pkgs]
+                safety.verdict(p, ctx), names.get(p, "")) for p in pkgs]
 
 
 def listing(device: "Device", uad: Uad, tiers: Sequence[str] = ("Recommended",), lst: Optional[str] = None,
