@@ -318,6 +318,15 @@ def check_read(cmd: str, device: Optional["Device"] = None) -> Verdict:
     return v
 
 
+def classify(cmd: str, host: bool = False) -> str:
+    """Rule name for bookkeeping (profile / history views). Never used to permit anything; "" if unknown."""
+    try:
+        _forbidden(cmd)
+        return _find(cmd, host)[0].name
+    except GuardError:
+        return ""
+
+
 def touches_of(cmd: str, device: Optional["Device"] = None, host: bool = False) -> List[str]:
     return list(check_command(cmd, device, host).touches)
 

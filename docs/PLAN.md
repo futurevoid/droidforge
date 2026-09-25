@@ -52,7 +52,7 @@ the health gate is not done.
 - [x] **P1.5** (R-11.2) `engine/history.py` JSONL timeline, `undo(ids)`, `rollback_to(id)` -> Plans (through the
   same executor, so undo is guarded and health-gated too). Accept: disable 3 packages, rollback to the first ->
   sim state equals initial; undone flags set.
-- [ ] **P1.6** (R-2.4) `engine/profile.py` per-device desired state, export/import (import = previewed plan, P14),
+- [x] **P1.6** (R-2.4) `engine/profile.py` per-device desired state, export/import (import = previewed plan, P14),
   legacy `cnrom_state.json` import of package keys only (language keys ignored). Accept: round-trip; legacy
   sample with `english`/`device_locale_prev` imports without creating any language step.
 - [ ] **P1.7** `engine/safety.py` verdicts (locked/guarded/expert/keep/unknown/ok), typed requirements, R-4.3b UI

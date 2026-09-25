@@ -28,6 +28,7 @@ from droidforge.engine.snapshot import Change, Snapshot
 
 if TYPE_CHECKING:  # pragma: no cover
     from droidforge.adb.device import Device
+    from droidforge.engine.profile import Profile
 
 ERR_RE = re.compile(r"(?i)\b(error|exception|failure|unknown package|not installed)\b")
 OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:")
@@ -56,6 +57,7 @@ class RunReport:
     advice: Tuple[str, ...] = ()
     baseline_health: Optional[HealthReport] = None
     baseline_snapshot: Optional[Snapshot] = None
+    final_health: Optional[HealthReport] = None
 
     @property
     def ok(self) -> bool:
@@ -90,7 +92,8 @@ def _send(step: Step, device: "Device") -> RunResult:
 
 
 def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = False,
-        history: Optional[History] = None, recovery_dir: Optional[Path] = None) -> RunReport:
+        history: Optional[History] = None, recovery_dir: Optional[Path] = None,
+        profile: Optional["Profile"] = None) -> RunReport:
     log = device.log
     rep = RunReport(plan=plan, batches_total=len(plan.batches()))
 
@@ -143,7 +146,7 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         now_s = snapshot.take(device, scope=scope)
         changes = snapshot.diff(base_s, now_s)
         rep.undeclared = snapshot.undeclared(changes, declared)
-        now_h = health.run(device)
+        now_h = rep.final_health = health.run(device)
         regs = health.compare(base_h, now_h, declared)
         pre = {p.name for p in base_h.failing}
         rep.regressions = [r for r in regs if r.probe not in pre]
@@ -187,8 +190,15 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
     else:
         rep.status = "done"
 
-    # 7.
+    # 7. caches + desired state (profile) + last healthy baseline (R-12.5)
     device.invalidate("plan finished")
+    if profile is not None:
+        profile.apply_results(rep.results)
+        profile.note_device(device)
+        if rep.status == "done" and rep.final_health is not None and not rep.final_health.failing:
+            profile.healthy_baseline = rep.final_health.to_dict()
+        if profile.path:
+            profile.save()
     return rep
 
 
