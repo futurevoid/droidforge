@@ -1,0 +1,13 @@
+__pycache__/
+*.egg-info/
+dist/
+build/
+.venv/
+.pytest_cache/
+.ruff_cache/
+# runtime files if run from the repo
+cnrom_state.json
+cnrom_actions.log
+cnrom_debug.log
+uad_lists.json
+backups/

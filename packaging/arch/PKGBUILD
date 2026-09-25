@@ -1,0 +1,33 @@
+# Maintainer: futurevoid <https://github.com/futurevoid>
+# Draft from planning - finalised in P8.4.
+pkgname=droidforge-git
+_pkgname=droidforge
+pkgver=r0.0000000
+pkgrel=1
+pkgdesc="English-ify, debloat, de-ad and harden ColorOS-family Android phones over adb (TUI + CLI)"
+arch=('any')
+url="https://github.com/futurevoid/droidforge"
+license=('GPL-3.0-or-later')
+depends=('python' 'python-textual' 'python-qrcode' 'python-platformdirs' 'android-tools')
+optdepends=('scrcpy: screen mirroring' 'libnotify: desktop notifications')
+makedepends=('git' 'python-build' 'python-installer' 'python-hatchling')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+source=("git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$_pkgname"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$_pkgname"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

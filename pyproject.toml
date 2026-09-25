@@ -1,0 +1,37 @@
+# Draft from planning - P0.1 completes it.
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "droidforge"
+version = "0.1.0.dev0"
+description = "English-ify, debloat, de-ad and harden ColorOS-family Android phones over adb - TUI + CLI"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.9"
+authors = [{ name = "0xlol (futurevoid)" }]
+dependencies = [
+    "textual>=8.0",
+    "qrcode>=8.0",
+    "platformdirs>=3.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.6"]
+
+[project.scripts]
+droidforge = "droidforge.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/futurevoid/droidforge"
+
+[tool.hatch.build.targets.wheel]
+packages = ["droidforge"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
