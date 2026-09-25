@@ -28,8 +28,11 @@ async def test_boots_on_sim(df_home: Path) -> None:
         bar = app.query_one(DeviceBar)
         assert "RMX8899" in bar.fields["device"] and "SIMULATED" in bar.fields["device"]
         assert app.query_one(ExpertBanner).has_class("hidden")
-        await pilot.pause(0.3)
         log = app.query_one(LogPane)
+        for _ in range(50):                      # the pane drains a bounded number of lines per tick
+            if any("Connected" in str(line) for line in log.lines):
+                break
+            await pilot.pause(0.1)
         assert any("Connected" in str(line) for line in log.lines)
         backups = list((df_home / "data" / "backups").rglob("*-session.json"))
         assert backups, "session-start backup (R-11.3)"
@@ -599,3 +602,61 @@ async def test_waits_for_phone_plugged_in_later(df_home: Path, monkeypatch) -> N
         assert app.session is not None and len(calls) == 3
         log = app.query_one(LogPane)
         assert sum("no device" in str(line) for line in log.lines) == 1
+
+
+async def test_names_arriving_keep_the_cursor(df_home: Path) -> None:
+    """Background names must not rebuild the picker: the highlighted row (keyboard cursor) stays put."""
+    from textual.app import App
+    from textual.widgets import SelectionList
+
+    from droidforge.tui.screens.common import AppPicker
+
+    class T(App[None]):
+        def compose(self):
+            yield AppPicker(id="ap")
+    app = T()
+    async with app.run_test(size=SIZE) as pilot:
+        ap = app.query_one(AppPicker)
+        ap.load(["com.a", "com.b", "com.c", "com.d"])
+        await pilot.pause()
+        sl = ap.query_one(SelectionList)
+        sl.focus()
+        await pilot.press("down", "down")
+        before = sl.highlighted
+        ap.set_names({"com.a": "Alpha", "com.c": "Charlie"})
+        await pilot.pause()
+        assert sl.highlighted == before and sl.option_count == 4
+        assert "Charlie" in str(sl.get_option("com.c").prompt)
+        ap.query_one("#ap Input").value = "charlie"      # names are searchable
+        await pilot.pause()
+        assert sl.option_count == 1
+
+
+async def test_enter_toggles_without_moving_the_cursor(df_home: Path) -> None:
+    from textual.app import App
+    from textual.widgets import DataTable
+
+    class T(App[None]):
+        def compose(self):
+            yield PackageTable(id="pt")
+    app = T()
+    async with app.run_test(size=SIZE) as pilot:
+        from droidforge.adb.sim import sim_device
+        from droidforge.log import Logger
+        pt = app.query_one(PackageTable)
+        pt.load(debloat.scan(sim_device(log=Logger(1)), UAD_SAMPLE, "heytap"))
+        await pilot.pause()
+        t = pt.query_one(DataTable)
+        t.focus()
+        await pilot.press("down", "down")
+        row = t.cursor_row
+        picked = pt.visible_rows()[row].pkg
+        await pilot.press("enter")
+        await pilot.pause()
+        assert t.cursor_row == row and pt.selection() == [picked]
+        await pilot.press("down", "enter")
+        await pilot.pause()
+        assert t.cursor_row == row + 1 and len(pt.selection()) == 2
+        pt.clear_selection()
+        await pilot.pause()
+        assert t.cursor_row == row + 1 and pt.selection() == []

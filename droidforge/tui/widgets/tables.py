@@ -34,7 +34,7 @@ class PackageTable(Vertical):
         yield Input(placeholder="filter packages (app name, package or description)", id="pkg-filter")
         t: DataTable = DataTable(id="pkg-table", cursor_type="row", zebra_stripes=True)
         cols = t.add_columns(" ", "status", "rating", "app name", "package", "note", "description")
-        self._name_col = cols[3]
+        self._check_col, self._name_col = cols[0], cols[3]
         yield t
 
     def load(self, rows: Iterable[Row]) -> None:
@@ -48,14 +48,43 @@ class PackageTable(Vertical):
                 if not f or f in r.pkg.lower() or f in r.name.lower() or f in r.description.lower()]
 
     def _redraw(self) -> None:
+        """Rebuild the rows (new data / filter). The cursor stays on the same package when it is still shown."""
         t = self.query_one(DataTable)
+        current = self._cursor_pkg()
         t.clear()
-        for r in self.visible_rows():
+        visible = self.visible_rows()
+        for r in visible:
             lock = LOCK_TEXT.get(r.verdict.level)
-            t.add_row(Text("[x]" if r.pkg in self.selected else "[ ]", style="bold" if r.pkg in self.selected else ""),
+            t.add_row(self._check_cell(r.pkg),
                       Text(r.status, style=STATUS_STYLE.get(r.status, "")),
                       Text(r.tier or "-", style=TIER_STYLE.get(r.tier, "dim")), self._name_cell(r), r.pkg,
                       Text(lock[0], style=lock[1]) if lock else "", r.description, key=r.pkg)
+
+        keys = [r.pkg for r in visible]
+        if current in keys:
+            t.move_cursor(row=keys.index(current))
+
+    def _cursor_pkg(self) -> Optional[str]:
+        t = self.query_one(DataTable)
+        if not t.row_count:
+            return None
+        try:
+            return str(t.coordinate_to_cell_key(t.cursor_coordinate).row_key.value)
+        except Exception:  # noqa: BLE001 - no valid cursor yet
+            return None
+
+    def _check_cell(self, pkg: str) -> Text:
+        on = pkg in self.selected
+        return Text("[x]" if on else "[ ]", style="bold" if on else "")
+
+    def _update_checks(self, pkgs: Iterable[str]) -> None:
+        """Change only the checkbox cells - the cursor never moves (Enter used to jump back to the top)."""
+        t = self.query_one(DataTable)
+        for p in pkgs:
+            try:
+                t.update_cell(p, self._check_col, self._check_cell(p))
+            except Exception:  # noqa: BLE001 - filtered out right now
+                pass
 
     def _name_cell(self, r: Row) -> Text:
         return Text(r.name, style="bold") if r.name else Text("...", style="dim")
@@ -81,19 +110,21 @@ class PackageTable(Vertical):
             self.selected.discard(pkg)
         else:
             self.selected.add(pkg)
-        self._redraw()
+        self._update_checks([pkg])
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.row_key.value:
             self.toggle(str(event.row_key.value))
 
     def select_all(self, pkgs: Iterable[str]) -> None:
-        self.selected |= set(pkgs)
-        self._redraw()
+        pkgs = set(pkgs)
+        self.selected |= pkgs
+        self._update_checks(pkgs)
 
     def clear_selection(self) -> None:
+        was = set(self.selected)
         self.selected.clear()
-        self._redraw()
+        self._update_checks(was)
 
     def selection(self) -> List[str]:
         return [r.pkg for r in self.rows if r.pkg in self.selected]

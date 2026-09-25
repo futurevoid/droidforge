@@ -8,6 +8,7 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, SelectionList
+from textual.widgets.selection_list import Selection
 
 
 class AppPicker(Vertical):
@@ -46,14 +47,23 @@ class AppPicker(Vertical):
         self._redrawing = True
         try:
             sl.clear_options()
-            sl.add_options([(self._prompt(p), p, p in self.chosen) for p in self.pkgs
+            sl.add_options([Selection(self._prompt(p), p, p in self.chosen, id=p) for p in self.pkgs
                             if not f or f in p.lower() or f in self.names.get(p, "").lower()])
         finally:
             self.call_after_refresh(self._done_redrawing)
 
     def set_names(self, names: Dict[str, str]) -> None:
-        self.names.update(names)
-        self._redraw()
+        """Names arriving in the background: change the row texts in place. Rebuilding the list here reset the
+        cursor while the user was moving through it, so key presses seemed to be lost."""
+        sl = self.query_one(SelectionList)
+        for p, name in names.items():
+            if self.names.get(p) == name:
+                continue
+            self.names[p] = name
+            try:
+                sl.replace_option_prompt(p, self._prompt(p))
+            except Exception:  # noqa: BLE001 - not shown right now (filtered out)
+                pass
 
     def _prompt(self, p: str) -> Text:
         t = Text()
