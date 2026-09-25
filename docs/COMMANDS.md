@@ -71,7 +71,7 @@ Anything not matching is refused at runtime. The "Forbidden" section at the end 
 | Purpose | Command | Undo | Status |
 |---|---|---|---|
 | Private DNS | `settings put global private_dns_mode hostname`; `settings put global private_dns_specifier dns.adguard-dns.com` | previous `private_dns_mode` / `_specifier` (or `off` / delete) | S (AOSP) |
-| DNS hostnames | AdGuard `dns.adguard-dns.com`, AdGuard family `family.adguard-dns.com`, Cloudflare `one.one.one.one`, Quad9 `dns.quad9.net`, Mullvad blocking `base.dns.mullvad.net`, NextDNS `<id>.dns.nextdns.io` | - | S (provider docs; re-check at implementation) |
+| DNS hostnames | AdGuard `dns.adguard-dns.com`, AdGuard family `family.adguard-dns.com`, Cloudflare `one.one.one.one`, Quad9 `dns.quad9.net`, Mullvad blocking `base.dns.mullvad.net`, NextDNS `<id>.dns.nextdns.io` | - | S (provider docs; all six resolved from the dev host on 2026-09-25) |
 | Notifications off | `pm revoke <p> android.permission.POST_NOTIFICATIONS` + `cmd appops set <p> POST_NOTIFICATION ignore` | `pm grant ...` + `... default` | L |
 | ADB install verification | `settings put global verifier_verify_adb_installs 0`; `settings put global package_verifier_enable 0` | previous values | S ([Medium cheatsheet](https://medium.com/@gbsendhil/apk-installation-failed-cheatsheet-9300668119ac)); ColorOS effect: V |
 

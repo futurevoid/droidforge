@@ -273,7 +273,13 @@ def sc_ads(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return ads.ads_plan(dev, ["magazine", "push", "launcher", "feed"], UAD_SAMPLE)
 
 
+def sc_dns(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import dns
+    return dns.dns_plan(dev)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.dns.dns_plan": sc_dns,
     "droidforge.features.privacy.telemetry_plan": sc_telemetry,
     "droidforge.features.ads.ads_plan": sc_ads,
     "droidforge.features.fix.startup_repair_plan": sc_fix_startup,

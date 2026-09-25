@@ -164,6 +164,11 @@ class Profile:
                 self.app_locale_prev.pop(pkg, None)
         elif rule == "fw-app":
             (_add if words[3] == "false" else _drop)(self.firewall, words[4])
+        elif rule in ("dns-mode", "dns-host"):
+            key = words[3]
+            if key not in self.dns_prev and st.undo:
+                u = st.undo[0].split()
+                self.dns_prev[key] = u[4] if u[1] == "put" and len(u) > 4 else ""
         elif rule == "deviceidle":
             arg = words[3]
             (_add if arg.startswith("+") else _drop)(self.keepalive, arg[1:])
