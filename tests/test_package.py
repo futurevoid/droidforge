@@ -66,3 +66,16 @@ def test_no_match_statements() -> None:
 def test_no_device_side_binaries() -> None:
     bad = [p for p in PKG.rglob("*") if p.suffix in (".dex", ".jar", ".apk", ".smali", ".so")]
     assert not bad, f"device-side binaries are forbidden (P9): {bad}"
+
+
+WRITE_PATH_OWNERS = {PKG / "engine" / "executor.py", PKG / "adb" / "device.py"}
+
+
+def test_only_executor_calls_device_sh() -> None:
+    """CLAUDE.md: nothing reaches the device except through engine/executor.py."""
+    for path in MODULES:
+        if path in WRITE_PATH_OWNERS:
+            continue
+        for n in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "sh":
+                raise AssertionError(f"{path}:{n.lineno} calls .sh() - writes go through engine/executor.py")
