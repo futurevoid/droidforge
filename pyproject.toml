@@ -1,15 +1,21 @@
-# Draft from planning - P0.1 completes it.
 [build-system]
 requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [project]
 name = "droidforge"
-version = "0.1.0.dev0"
+dynamic = ["version"]
 description = "English-ify, debloat, de-ad and harden ColorOS-family Android phones over adb - TUI + CLI"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
 requires-python = ">=3.9"
+classifiers = [
+    "Environment :: Console",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Utilities",
+]
 authors = [{ name = "0xlol (futurevoid)" }]
 dependencies = [
     "textual>=8.0",
@@ -29,9 +35,18 @@ Homepage = "https://github.com/futurevoid/droidforge"
 [tool.hatch.build.targets.wheel]
 packages = ["droidforge"]
 
+[tool.hatch.version]
+path = "droidforge/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["droidforge", "tests", "docs", "README.md", "LICENSE"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py39"
+# legacy/cnrom_fix.py is the frozen behavioural reference (retired tool) - not linted, not edited.
+extend-exclude = ["legacy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"

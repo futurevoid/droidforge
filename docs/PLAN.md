@@ -11,7 +11,7 @@ the health gate is not done.
 
 ## Phase 0 - Scaffold
 
-- [ ] **P0.1** (R-13.1) Package skeleton per ARCHITECTURE.md; complete the draft `pyproject.toml` (hatchling, py>=3.9, deps textual/qrcode/
+- [x] **P0.1** (R-13.1) Package skeleton per ARCHITECTURE.md; complete the draft `pyproject.toml` (hatchling, py>=3.9, deps textual/qrcode/
   platformdirs, dev: pytest/ruff), console script. No data files for the phone (P9).
   Accept: `pip install -e .` works; `droidforge --version`; `ruff check` clean; `pytest` runs (0 tests OK).
 - [ ] **P0.2** (R-11.6, P3) `config.py` (XDG dirs, config.json with theme/verbosity/last device) and `log.py` (verbosity
