@@ -6,7 +6,8 @@ Engine calls run in thread workers; log lines reach the LogPane through a thread
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+import threading
+from typing import Callable, Dict, List, Optional, Tuple
 
 from textual import work
 from textual.app import App, ComposeResult
@@ -18,11 +19,17 @@ from droidforge import config
 from droidforge.adb.device import list_devices
 from droidforge.adb.real import RealBackend
 from droidforge.adb.sim import FakePhone
+from droidforge.engine import executor
+from droidforge.engine.executor import RunReport
+from droidforge.engine.plan import Confirmation, Plan
 from droidforge.log import LOG
 from droidforge.session import ConnectError, Session, open_session
-from droidforge.tui.screens.modals import DevicePicker, LimitsNote
+from droidforge.tui.screens.modals import DevicePicker, LimitsNote, MessageBox
 from droidforge.tui.widgets.device_bar import DeviceBar, ExpertBanner
 from droidforge.tui.widgets.log_pane import LogPane
+from droidforge.tui.widgets.plan_preview import PlanPreview
+
+PlanDone = Callable[[RunReport], None]
 
 SECTIONS: List[Tuple[str, str]] = [
     ("dashboard", "Dashboard"),
@@ -72,6 +79,7 @@ class DroidforgeApp(App[None]):
         self.session: Optional[Session] = None
         self.sections: Dict[str, Section] = {}
         self.status_text = "connecting..."
+        self.last_report: Optional[RunReport] = None
 
     # ------------------------------------------------------------------ layout
     def compose(self) -> ComposeResult:
@@ -158,3 +166,57 @@ class DroidforgeApp(App[None]):
         self.query_one(DeviceBar).show(
             profile=prof, verbosity=f"verbosity {LOG.verbosity}",
             dry_run="DRY-RUN" if self.dry_run else "", expert="EXPERT" if self.expert else "", **fields)
+
+    # ------------------------------------------------------------------ plans
+    def run_plan(self, plan: Plan, on_done: Optional[PlanDone] = None) -> None:
+        """Preview -> confirm -> execute in a worker. Plans without steps only show their notes."""
+        if self.session is None:
+            self.notify("No phone connected", severity="error")
+            return
+        if not plan.steps:
+            self.push_screen(MessageBox(plan.title, "\n".join(plan.notes) or "Nothing to do."))
+            return
+        self._plan_worker(plan, on_done)
+
+    @work(thread=True, exclusive=True, group="plan")
+    def _plan_worker(self, plan: Plan, on_done: Optional[PlanDone]) -> None:
+        s = self.session
+        assert s is not None
+        rep = executor.run(plan, s.device, self.confirm_blocking, dry_run=self.dry_run, history=s.history,
+                           profile=s.profile, expert_mode=self.expert)
+        self.call_from_thread(self._plan_finished, rep, on_done)
+
+    def confirm_blocking(self, plan: Plan) -> Confirmation:
+        """The executor's confirm hook (runs in the worker thread): block until the preview is dismissed."""
+        done = threading.Event()
+        box: Dict[str, Confirmation] = {}
+
+        def show() -> None:
+            def result(r: Optional[Confirmation]) -> None:
+                box["r"] = r or Confirmation(False)
+                done.set()
+            self.push_screen(PlanPreview(plan, dry_run=self.dry_run), result)
+        self.call_from_thread(show)
+        done.wait()
+        return box["r"]
+
+    def _plan_finished(self, rep: RunReport, on_done: Optional[PlanDone]) -> None:
+        self.last_report = rep
+        self.refresh_bar()
+        if rep.status == "refused":
+            self.push_screen(MessageBox("Refused", rep.error))
+        elif rep.status == "stopped":
+            self.on_breakage(rep)
+        elif rep.status in ("done", "dry-run"):
+            ok = sum(1 for r in rep.results if r.ok)
+            self.notify(f"{rep.plan.title}: {ok}/{len(rep.results)} step(s) ok"
+                        + (" (dry-run)" if rep.status == "dry-run" else ""))
+        current = self.query_one(ContentSwitcher).current or "dashboard"
+        self.sections[current].refresh_from(self)
+        if on_done is not None:
+            on_done(rep)
+
+    def on_breakage(self, rep: RunReport) -> None:
+        """Replaced by the breakage alert (P3.5)."""
+        body = "\n".join([str(r) for r in rep.regressions] + [str(c) for c in rep.undeclared] + list(rep.advice))
+        self.push_screen(MessageBox("Stopped: something changed that should not have", body))
