@@ -25,6 +25,7 @@ class DashboardSection(Section):
             yield Button("Run doctor", id="doctor")
             yield Button("Reboot & re-check", id="reboot-check")
             yield Button("Expert mode", id="expert")
+            yield Button("HTML report", id="report")
         yield Static("", id="alerts")
         yield Static("Connecting...", id="doctor-report", markup=False)
 
@@ -56,3 +57,8 @@ class DashboardSection(Section):
             self.dapp.run_reboot_check()
         elif event.button.id == "expert":
             self.dapp.action_toggle_expert()
+        elif event.button.id == "report" and self.dapp.session is not None:
+            from droidforge.engine import report
+            s = self.dapp.session
+            self.dapp.background(lambda: report.write(s.device, s.history, "", True),
+                                 lambda path: self.dapp.notify(f"Report written: {path}"))

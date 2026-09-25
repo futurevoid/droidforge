@@ -121,6 +121,9 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     rb = sub.add_parser("rollback", help="undo an entry and everything newer")
     rb.add_argument("id")
     sub.add_parser("uad-update", help="download the UAD-NG package list (about 1.6 MB, GitHub)")
+    rp = sub.add_parser("report", help="write the HTML session report (R-11.4)")
+    rp.add_argument("--audit", action="store_true", help="include the audit (permissions, signers, connections)")
+    rp.add_argument("--since", default="", help="ISO time; default: all history")
     au = sub.add_parser("audit", help="read-only audit: perms / signers / net (--json for scripts)")
     au.add_argument("what", choices=["perms", "signers", "net"])
     au.add_argument("--json", action="store_true")
@@ -453,6 +456,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             import json
             Path(args.profile).write_text(json.dumps(s.profile.export(), indent=2, sort_keys=True), encoding="utf-8")
             print(f"Profile exported to {args.profile}")
+            return 0
+        if args.command == "report":
+            from droidforge.engine import report
+            print(f"Report written: {report.write(s.device, s.history, args.since, args.audit)}")
             return 0
         if args.command == "audit":
             return cmd_audit(s, args.what, args.json, args.all)
