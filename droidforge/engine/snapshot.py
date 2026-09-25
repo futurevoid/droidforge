@@ -10,6 +10,7 @@ Every value is flattened to a key in the same vocabulary as `Step.touches` / the
     appop:<p>:<OP>              cmd appops get <p>             (scope packages)
     applocale:<p>               cmd locale get-app-locales     (user apps + scope; every package when full=True)
     ime:enabled:<id>            ime list -s
+    role:<role>                 cmd role get-role-holders (browser / SMS / dialer)
     launcher                    resolve-activity HOME
     config:<field>              dumpsys activity | grep -m1 mGlobalConfig
 
@@ -34,6 +35,7 @@ if TYPE_CHECKING:  # pragma: no cover
 NAMESPACES = ("system", "secure", "global")
 HOME_CMD = "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 CONFIG_CMD = "dumpsys activity | grep -m1 mGlobalConfig"
+ROLES = ("android.app.role.BROWSER", "android.app.role.SMS", "android.app.role.DIALER")
 
 
 @dataclass
@@ -46,6 +48,7 @@ class Snapshot:
     details: Dict[str, dict] = field(default_factory=dict)              # {pkg: {suspended, perms, appops}}
     app_locales: Dict[str, str] = field(default_factory=dict)
     imes: List[str] = field(default_factory=list)
+    roles: Dict[str, str] = field(default_factory=dict)
     launcher: str = ""
     config: Dict[str, str] = field(default_factory=dict)
 
@@ -70,6 +73,8 @@ class Snapshot:
             f[f"applocale:{p}"] = loc
         for i in self.imes:
             f[f"ime:enabled:{i}"] = "true"
+        for role, holders in self.roles.items():
+            f[f"role:{role}"] = holders
         f["launcher"] = self.launcher
         for k, v in self.config.items():
             f[f"config:{k}"] = v
@@ -141,6 +146,9 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
         targets = sorted(installed) if full else sorted((device.packages("-3") | set(scope)) & installed)
         res = batch_read(device, targets, "cmd locale get-app-locales $p --user 0", label="app locales")
         s.app_locales = {p: parse.app_locales(o) for p, o in res.items()}
+    for role in ROLES:
+        r = device.read(f"cmd role get-role-holders --user 0 {role}")
+        s.roles[role] = ",".join(sorted(x.strip() for x in r.out.splitlines() if x.strip())) if r.ok else ""
     s.imes = parse.ime_ids(device.read("ime list -s").out)
     s.launcher = parse.last_component(device.read(HOME_CMD).out)
     s.config = parse.global_config(device.read(CONFIG_CMD).out)

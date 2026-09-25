@@ -675,6 +675,15 @@ class SimBackend:
                 return _ok(f"Package {p.name} installed for user: 0")
         if svc == "locale":
             return self._locale(t[2:])
+        if svc == "role" and len(t) >= 6 and t[3:5] == ["--user", "0"]:
+            role = t[5]
+            if t[2] == "get-role-holders":
+                return _ok("\n".join(self.phone.roles.get(role, [])))
+            if t[2] == "add-role-holder" and len(t) == 7:
+                if not self.phone.pkg_ok(t[6]):
+                    return _fail(f"java.lang.IllegalArgumentException: Unknown package: {t[6]}", 255)
+                self.phone.roles[role] = [t[6]]   # BROWSER / SMS / DIALER are exclusive
+                return _ok()
         if svc == "appops":
             return self._appops(t[2:])
         if svc == "connectivity":

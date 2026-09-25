@@ -34,7 +34,7 @@ if TYPE_CHECKING:  # pragma: no cover
 ERR_RE = re.compile(r"(?i)\b(error|exception|failure|unknown package|not installed)\b")
 BOOT_POLL_S = 2.0
 BOOT_FAIL = "the phone did not come back after the reboot"
-OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:", "fw:")
+OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:", "fw:", "role:")
 UNOBSERVABLE = ("fw:chain3",)   # no getter for the chain switch
 
 ConfirmHook = Callable[[Plan], Union[bool, Confirmation]]

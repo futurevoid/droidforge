@@ -331,7 +331,14 @@ def sc_folder(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return apps.folder_plan(dev, d)
 
 
+def sc_swap(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import defaults
+    from tests.helpers import UAD_SAMPLE
+    return defaults.swap_plan(dev, "browser", disable_coloros=True, uad=UAD_SAMPLE)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.defaults.swap_plan": sc_swap,
     "droidforge.features.apps.play_plan": sc_play,
     "droidforge.features.apps.install_plan": sc_install,
     "droidforge.features.apps.folder_plan": sc_folder,
