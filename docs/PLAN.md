@@ -25,7 +25,7 @@ the health gate is not done.
   permission resolve-activity results. Fault injection: `side_effects`, `break_ui()`. Unknown command -> 127.
   Accept: `tests/test_sim.py` round-trips (disable->list -d->enable, app-locale set/get, batch loop output format
   identical to legacy mock, `break_ui()` visible through the probe commands).
-- [ ] **P0.5** (R-13.2, R-13.3) GitHub Actions: ruff + pytest on 3.9 and 3.13. `packaging/arch/PKGBUILD` builds from git.
+- [x] **P0.5** (R-13.2, R-13.3) GitHub Actions: ruff + pytest on 3.9 and 3.13. `packaging/arch/PKGBUILD` builds from git.
 
 ## Phase 1 - Engine
 
