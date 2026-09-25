@@ -1,7 +1,8 @@
 """`doctor` (R-2.8): read-only report - device, ROM, root, Shizuku, capabilities, the R-11.7 health probes, the
 comparison with the last healthy baseline, droidforge's history on this device, and the recovery advice in order:
-(1) the permission-monitoring switch, (2) undo droidforge's recent plans, (3) Settings > Reset all settings.
-It never repairs anything itself.
+(2) undo droidforge's recent plans, (3) Settings > Reset all settings. It never repairs anything itself.
+Owner decision 2026-09-25: doctor does not check the "Disable permission monitoring" switch (the owner keeps it on
+for Shizuku when needed); the executor's health gate still reads it.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from droidforge.engine.profile import Profile
 
 SHIZUKU = "moe.shizuku.privileged.api"
+SWITCH_PROBE = "permission_monitoring"
 
 
 @dataclass
@@ -86,10 +88,11 @@ def run(device: "Device", profile: Optional["Profile"] = None, history: Optional
                      + (f"; last: {last.plan_title} ({last.ts})" if last else "")))
 
     h = rep.health = health.run(device)
+    h.probes.pop(SWITCH_PROBE, None)   # owner decision: doctor does not check the switch
     rep.failing = h.failing
     if profile is not None and profile.healthy_baseline:
         base = HealthReport.from_dict(profile.healthy_baseline)
-        rep.regressions = [r for r in health.compare(base, h) if r.probe != "permission_monitoring"]
+        rep.regressions = [r for r in health.compare(base, h) if r.probe != SWITCH_PROBE]
     alerts: List[Regression] = [Regression(p.name, p.label, "", p.value, p.detail) for p in rep.failing]
     rep.advice = health.advice(alerts + rep.regressions)
 

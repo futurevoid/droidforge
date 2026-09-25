@@ -43,10 +43,9 @@ def test_break_ui_doctor_prints_failures_and_advice(sim, phone: FakePhone) -> No
     text = "\n".join(rep.lines())
     assert "[FAIL] Settings home screen" in text and "[FAIL] Permission screen" in text
     assert "[FAIL] System accent colour: 0" in text
-    assert "'Disable permission monitoring' is ON" in text
-    assert rep.advice[0].startswith("1) If the 'Disable permission monitoring'")
-    assert "Reset all settings" in rep.advice[-1]
-    assert text.index("1) If the") < text.index("2) Undo") < text.index("3) Last resort")
+    assert "permission monitoring" not in text.lower()          # owner decision: doctor skips the switch
+    assert rep.advice[0].startswith("2) Undo") and "Reset all settings" in rep.advice[-1]
+    assert text.index("2) Undo") < text.index("3) Last resort")
     only_reads(phone, sim, n)
 
 
@@ -61,10 +60,11 @@ def test_regressions_vs_last_healthy_baseline(sim, phone: FakePhone) -> None:
     assert prof.healthy_baseline["font_scale"]["value"] == "1.0"  # a broken state never becomes the baseline
 
 
-def test_unknown_permission_switch_is_not_called_healthy(sim, phone: FakePhone) -> None:
-    del phone.props["persist.sys.permission.enable"]
-    text = "\n".join(doctor.run(sim, None, None).lines())
-    assert "[??  ] 'Disable permission monitoring' switch: unknown" in text
+def test_doctor_does_not_check_the_switch(sim, phone: FakePhone) -> None:
+    phone.permission_monitoring_disabled = True        # switch on, everything else healthy
+    rep = doctor.run(sim, Profile(), None)
+    assert rep.healthy and "permission monitoring" not in "\n".join(rep.lines()).lower()
+    assert "permission_monitoring" not in rep.health.probes
 
 
 # ---------------------------------------------------------------- CLI
@@ -80,7 +80,7 @@ def test_cli_doctor_broken_exits_nonzero(capsys: pytest.CaptureFixture, monkeypa
     monkeypatch.setattr(cli, "SESSION_FACTORY", lambda **kw: open_session(phone=ph, **kw))
     assert cli.main(["-q", "--simulate", "doctor"]) == 2
     out = capsys.readouterr().out
-    assert "Reset all settings" in out and "Turn it off: Developer options" in out
+    assert "Reset all settings" in out and "Turn it off: Developer options" not in out
 
 
 def test_cli_without_adb_explains(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
