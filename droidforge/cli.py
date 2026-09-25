@@ -304,6 +304,9 @@ def build_plan(args: argparse.Namespace, s: Session) -> Optional[Plan]:
     return None
 
 
+PICKER_NEW_NAMES = 40   # app names read for the CLI picker per run (cached afterwards)
+
+
 def pick_keepalive(dev: "Device", remove: bool, ask: Optional[Callable[[str], str]] = None) -> List[str]:
     """Numbered list of your apps with their keep-alive status; pick by number (1,4,7 / 2-9 / names)."""
     from droidforge.features import keepalive
@@ -315,7 +318,7 @@ def pick_keepalive(dev: "Device", remove: bool, ask: Optional[Callable[[str], st
         print("No apps to pick." if not remove else "No app is kept alive by droidforge.")
         return []
     from droidforge.adb import labels
-    names = labels.lookup(dev, items)
+    names = labels.lookup(dev, items, max_new=PICKER_NEW_NAMES)
     w = len(str(len(items)))
     for n, p in enumerate(items, 1):
         print(ascii_safe(f" {n:>{w}}) {names.get(p, ''):<24.24} {p:<44} {('[' + st[p] + ']') if st.get(p) else ''}"))

@@ -37,7 +37,8 @@ BOOT_POLL_S = 2.0
 BOOT_FAIL = "the phone did not come back after the reboot"
 OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:", "fw:", "role:",
               "deviceidle:", "standby:", "bgrestrict:", "devcfg:", "prop:")
-UNOBSERVABLE = ("fw:chain3",)   # no getter for the chain switch
+UNOBSERVABLE = ("fw:chain3",)
+PREVIEW_NEW_NAMES = 15   # app names read for a preview; the rest come from the cache or stay unknown   # no getter for the chain switch
 
 ConfirmHook = Callable[[Plan], Union[bool, Confirmation]]
 
@@ -129,9 +130,9 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         log.error(f"Plan refused by the guard: {e.reason} ({e.cmd})")
         return rep
 
-    # 2. confirm (P1) - with each package's app name next to it, so the right app is picked
+    # 2. confirm (P1) - app names next to the packages (cached; at most a few new APKs are read here)
     if plan.packages() and not plan.names:
-        plan.names.update(labels.lookup(device, plan.packages()))
+        plan.names.update(labels.lookup(device, plan.packages(), max_new=PREVIEW_NEW_NAMES))
     ok, why = _typed_ok(plan, confirm(plan))
     if not ok:
         rep.status, rep.error = ("cancelled", "") if why == "cancelled" else ("refused", why)

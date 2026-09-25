@@ -8,7 +8,6 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Input, Label, Static
 
-from droidforge.adb import labels
 from droidforge.data import uad
 from droidforge.features import firewall
 from droidforge.tui.screens.base import Section
@@ -37,7 +36,7 @@ class FirewallSection(Section):
         def read() -> Tuple[bool, List[str], List[str], Dict[str, str]]:
             ok = firewall.supported(dev)
             apps = sorted(dev.packages("-3"))
-            return ok, apps, firewall.missing_rules(dev, s.profile) if ok else [], labels.lookup(dev, apps)
+            return ok, apps, firewall.missing_rules(dev, s.profile) if ok else [], {}
         app.background(read, self.show)
 
     def show(self, res: Tuple[bool, List[str], List[str], Dict[str, str]]) -> None:
@@ -48,7 +47,9 @@ class FirewallSection(Section):
         if missing:
             msg += f"\nRules missing (reboot): {', '.join(missing)}"
         self.query_one("#fw-status", Static).update(msg)
-        self.query_one(AppPicker).load(apps, None, names)
+        picker = self.query_one(AppPicker)
+        picker.load(apps, None, names)
+        self.dapp.load_names(apps, picker.set_names)
 
     def _picked(self) -> List[str]:
         extra = self.query_one("#fw-pkg", Input).value.strip()

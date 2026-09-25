@@ -25,6 +25,7 @@ from typing import Callable, List, Optional, TextIO
 LEVEL_NAMES = {1: "results only", 2: "commands + exit codes + timing + first 15 lines + decisions",
                3: "ULTRA - everything, full output, internal calls, cache hits, timestamps"}
 OUTPUT_LINES_AT_2 = 15
+OUTPUT_LINES_AT_3 = 200   # the screen / console never gets more per command; the debug log has everything
 DEBUG_LOG_MAX = 20 * 1024 * 1024
 
 
@@ -127,24 +128,26 @@ class Logger:
         self.dbg(f"RUN   {pretty}")
         self._emit("cmd", f"  {self._ts()}$ {pretty}", 3 if plumbing else 2)
 
-    def result(self, code: int, ms: int, out: str, err: str, plumbing: bool = False) -> None:
+    def result(self, code: int, ms: int, out: str, err: str, plumbing: bool = False, quiet: bool = False) -> None:
+        """`quiet`: bulk data (base64 of an APK member) - only the exit line is logged, never the body."""
         olines, elines = out.splitlines(), err.splitlines()
-        self.dbg(f"EXIT  {code}  ({ms} ms, {len(olines)} stdout / {len(elines)} stderr lines)")
-        for ln in olines:
-            self.dbg(f"  out | {ln}")
-        for ln in elines:
-            self.dbg(f"  err | {ln}")
+        body = [f"EXIT  {code}  ({ms} ms, {len(olines)} stdout / {len(elines)} stderr lines)"]
+        body += [f"  out | ({len(olines)} line(s) of data, not logged)"] if quiet else [f"  out | {ln}" for ln in olines]
+        body += [f"  err | {ln}" for ln in elines]
+        self.dbg("\n".join(body))   # one write per command (a write per line slowed big reads down)
         lvl = 3 if plumbing else 2
         if self._verbosity < lvl:
             return
         errs = f", {len(elines)} err" if elines else ""
         self._emit("exit", f"    -> exit {code} | {ms} ms | {len(olines)} line(s) out{errs}", lvl)
-        limit = None if self._verbosity >= 3 else OUTPUT_LINES_AT_2
+        if quiet:
+            olines = []
+        limit = OUTPUT_LINES_AT_3 if self._verbosity >= 3 else OUTPUT_LINES_AT_2
         for ln in olines[:limit]:
             self._emit("out", f"    | {ln}", lvl)
-        if limit is not None and len(olines) > limit:
-            self._emit("more", f"    | ... {len(olines) - limit} more line(s) - full text in the debug log "
-                               f"(or verbosity 3)", lvl)
+        if len(olines) > limit:
+            self._emit("more", f"    | ... {len(olines) - limit} more line(s) - full text in the debug log"
+                               + ("" if self._verbosity >= 3 else " (or verbosity 3)"), lvl)
         for ln in elines[:limit]:
             self._emit("err", f"    ! {ln}", lvl)
 

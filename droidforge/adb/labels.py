@@ -31,6 +31,10 @@ FLAG_SPARSE, FLAG_OFFSET16 = 0x01, 0x02          # ResTable_type flags
 ENTRY_COMPLEX, ENTRY_COMPACT = 0x0001, 0x0008    # ResTable_entry flags
 APK_PATH = r"/[A-Za-z0-9_./~=+\-]+\.apk"
 MAX_LABEL = 80
+# Bounded reads: a manifest is small; resources.arsc can be tens of MB on big system apps - past the cap the name
+# stays unknown instead of moving that much data over adb.
+LIMITS = {"AndroidManifest.xml": 512 * 1024, "resources.arsc": 8 * 1024 * 1024}
+MAGIC = {"AndroidManifest.xml": b"\x03\x00\x08\x00", "resources.arsc": b"\x02\x00\x0c\x00"}
 
 
 class LabelError(Exception):
@@ -216,7 +220,28 @@ def apk_paths(device: "Device") -> Dict[str, str]:
 def unzip_cmd(path: str, member: str) -> str:
     if not re.fullmatch(APK_PATH, path):
         raise LabelError(f"unexpected APK path {path!r}")
-    return f"unzip -p '{path}' {member} | base64"
+    return f"unzip -p '{path}' {member} | head -c {LIMITS[member]} | base64"
+
+
+B64_LINE = re.compile(r"^[A-Za-z0-9+/=]+$")
+
+
+def decode_member(out: str, magic: bytes = b"") -> Optional[bytes]:
+    """base64 text from the phone -> the file's bytes. Lenient: lines that are not base64 (a warning printed on
+    stdout) are dropped, and anything before the file's magic (a header unzip may write) is skipped."""
+    text = "".join(ln.strip() for ln in out.splitlines() if B64_LINE.match(ln.strip()))
+    if not text:
+        return None
+    try:
+        data = base64.b64decode(text + "=" * (-len(text) % 4))
+    except (binascii.Error, ValueError):
+        return None
+    if magic:
+        i = data.find(magic)
+        if i < 0:
+            return None
+        data = data[i:]
+    return data
 
 
 def _fetch(device: "Device", path: str, member: str) -> Optional[bytes]:
@@ -224,13 +249,8 @@ def _fetch(device: "Device", path: str, member: str) -> Optional[bytes]:
         cmd = unzip_cmd(path, member)
     except LabelError:
         return None
-    r = device.read(cmd, timeout=60)
-    if not r.ok or not r.out.strip():
-        return None
-    try:
-        return base64.b64decode("".join(r.out.split()), validate=True)
-    except (binascii.Error, ValueError):
-        return None
+    r = device.read(cmd, timeout=60, quiet=True)   # bulk data: never printed to the log pane
+    return decode_member(r.out, MAGIC[member]) if r.out.strip() else None
 
 
 def read_label(device: "Device", path: str) -> str:
@@ -278,30 +298,34 @@ class LabelCache:
         except OSError:
             pass
 
-    def lookup(self, device: "Device", pkgs: Iterable[str]) -> Dict[str, str]:
-        """{package: label} for `pkgs` ("" when unknown). Reads only APKs that are new or changed."""
+    def lookup(self, device: "Device", pkgs: Iterable[str], max_new: Optional[int] = None,
+               paths: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """{package: label} for `pkgs` ("" when unknown). Reads only APKs that are new or changed, at most
+        `max_new` of them per call (the rest stay unknown until a later call). `paths` from apk_paths() can be
+        passed in when looking up in chunks."""
         wanted = list(dict.fromkeys(p for p in pkgs if p))
         if not wanted:
             return {}
-        paths = apk_paths(device)
+        paths = paths if paths is not None else apk_paths(device)
         todo = [p for p in wanted if p in paths and self.data.get(p, ["", ""])[0] != paths[p]]
-        for i, p in enumerate(todo, 1):
-            if len(todo) > 10 and (i == 1 or i % 25 == 0):
-                device.log.info(f"Reading app names: {i}/{len(todo)}")
+        if max_new is not None:
+            todo = todo[:max_new]
+        for p in todo:
             self.data[p] = [paths[p], read_label(device, paths[p])]
         if todo:
             self.save()
         return {p: self.data[p][1] for p in wanted if p in self.data and self.data[p][1]}
 
 
-def lookup(device: "Device", pkgs: Iterable[str]) -> Dict[str, str]:
+def lookup(device: "Device", pkgs: Iterable[str], max_new: Optional[int] = None,
+           paths: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """{package: label} with the on-disk cache for this phone. Never raises: names are a display aid."""
     try:
         cache = getattr(device, "_labels", None)
         if cache is None:
             cache = LabelCache.for_device(device)
             device._labels = cache  # type: ignore[attr-defined]
-        return cache.lookup(device, pkgs)
+        return cache.lookup(device, pkgs, max_new, paths)
     except Exception as e:  # noqa: BLE001 - a missing name must never stop a plan or a list
         device.log.trace(f"app names unavailable: {e}", 2)
         return {}

@@ -284,6 +284,8 @@ async def test_every_section_runs_one_action(df_home: Path) -> None:
         await settle(app, pilot)
         table = app.query_one(PackageTable)
         assert "com.heytap.market" in [r.pkg for r in table.rows]
+        await settle(app, pilot)                       # app names arrive after the list (background worker)
+        assert {r.pkg: r.name for r in table.rows}["com.heytap.market"] == "App Market"
         table.toggle("com.heytap.market")
         press(app, "#act-disable")
         await run_previewed(app, pilot)

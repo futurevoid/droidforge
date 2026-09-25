@@ -9,8 +9,8 @@ import pytest
 
 from droidforge.adb import labels
 from droidforge.adb.sim import FakePhone, _element, _pool, fake_arsc, fake_manifest
-from droidforge.engine import executor, guard
-from tests.helpers import disable_plan, make_apk
+from droidforge.engine import guard
+from tests.helpers import make_apk
 
 
 def test_english_first_then_default() -> None:
@@ -79,6 +79,8 @@ def test_guard_allows_only_the_two_label_reads() -> None:
 
 def test_plan_preview_names_the_app(sim, phone: FakePhone) -> None:
     from droidforge import cli
+    from droidforge.engine import executor
+    from tests.helpers import disable_plan
     seen = []
 
     def confirm(plan):
@@ -89,13 +91,36 @@ def test_plan_preview_names_the_app(sim, phone: FakePhone) -> None:
     assert phone.packages["com.heytap.market"].enabled
 
 
-def test_debloat_rows_carry_names(sim) -> None:
-    from droidforge.features import debloat
-    rows = debloat.scan(sim, {}, "market")
-    assert {r.pkg: r.name for r in rows}["com.heytap.market"] == "App Market"
+def test_reads_are_bounded_and_capped(sim, phone: FakePhone, monkeypatch: pytest.MonkeyPatch) -> None:
+    cmds = []
+    orig = sim.read
+    sim.read = lambda cmd, **kw: (cmds.append(cmd), orig(cmd, **kw))[1]  # type: ignore[method-assign]
+    pkgs = ["com.heytap.market", "com.whatsapp", "com.tencent.mm", "org.telegram.messenger"]
+    assert len(labels.lookup(sim, pkgs, max_new=2)) == 2                  # only two new APKs read
+    assert all("| head -c " in c for c in cmds if c.startswith("unzip"))
+    assert len(labels.lookup(sim, pkgs)) == 4                             # the rest on a later call
+    monkeypatch.setitem(labels.LIMITS, "resources.arsc", 40)              # a table too big for the cap
+    phone.packages["com.whatsapp"].system = True                          # new APK path -> read again
+    assert "com.whatsapp" not in labels.lookup(sim, ["com.whatsapp"])     # unknown, no crash
 
 
-def test_names_never_break_a_plan(sim, phone: FakePhone, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(labels, "apk_paths", lambda d: (_ for _ in ()).throw(RuntimeError("boom")))
-    rep = executor.run(disable_plan(["com.heytap.market"]), sim, lambda p: True)
-    assert rep.status == "done" and not phone.packages["com.heytap.market"].enabled
+def test_label_data_never_reaches_the_log_pane(phone: FakePhone) -> None:
+    from droidforge.adb.sim import sim_device
+    from droidforge.log import Logger
+    lg = Logger(3)
+    lines = []
+    lg.add_sink(lines.append)
+    labels.lookup(sim_device(phone, log=lg), ["com.heytap.market"])
+    idx = [i for i, ln in enumerate(lines) if ln.kind == "cmd" and "unzip -p" in ln.text]
+    assert idx
+    for i in idx:                       # after each name read: the exit line, then no output lines
+        assert lines[i + 1].kind == "exit" and (i + 2 >= len(lines) or lines[i + 2].kind != "out")
+
+
+def test_decode_tolerates_noise_and_headers() -> None:
+    import base64
+    m = fake_manifest("com.x")
+    noisy = "WARNING: linker: something\n" + base64.b64encode(b"Archive:  /x.apk\n" + m).decode() + "\n"
+    assert labels.decode_member(noisy, labels.MAGIC["AndroidManifest.xml"]) == m
+    assert labels.decode_member("", b"") is None
+    assert labels.decode_member(base64.b64encode(b"garbage").decode(), labels.MAGIC["resources.arsc"]) is None

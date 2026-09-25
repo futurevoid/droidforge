@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable, List, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -33,7 +33,8 @@ class PackageTable(Vertical):
     def compose(self) -> ComposeResult:
         yield Input(placeholder="filter packages (app name, package or description)", id="pkg-filter")
         t: DataTable = DataTable(id="pkg-table", cursor_type="row", zebra_stripes=True)
-        t.add_columns(" ", "status", "rating", "app name", "package", "note", "description")
+        cols = t.add_columns(" ", "status", "rating", "app name", "package", "note", "description")
+        self._name_col = cols[3]
         yield t
 
     def load(self, rows: Iterable[Row]) -> None:
@@ -53,9 +54,22 @@ class PackageTable(Vertical):
             lock = LOCK_TEXT.get(r.verdict.level)
             t.add_row(Text("[x]" if r.pkg in self.selected else "[ ]", style="bold" if r.pkg in self.selected else ""),
                       Text(r.status, style=STATUS_STYLE.get(r.status, "")),
-                      Text(r.tier or "-", style=TIER_STYLE.get(r.tier, "dim")), Text(r.name or "?", style="bold"
-                                                                                       if r.name else "dim"), r.pkg,
+                      Text(r.tier or "-", style=TIER_STYLE.get(r.tier, "dim")), self._name_cell(r), r.pkg,
                       Text(lock[0], style=lock[1]) if lock else "", r.description, key=r.pkg)
+
+    def _name_cell(self, r: Row) -> Text:
+        return Text(r.name, style="bold") if r.name else Text("...", style="dim")
+
+    def set_names(self, names: Dict[str, str]) -> None:
+        """Fill in app names as they arrive (background), without rebuilding the table."""
+        t = self.query_one(DataTable)
+        for r in self.rows:
+            if r.pkg in names and names[r.pkg] != r.name:
+                r.name = names[r.pkg]
+                try:
+                    t.update_cell(r.pkg, self._name_col, self._name_cell(r))
+                except Exception:  # noqa: BLE001 - the row is filtered out right now
+                    pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "pkg-filter":

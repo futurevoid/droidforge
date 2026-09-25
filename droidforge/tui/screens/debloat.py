@@ -76,7 +76,9 @@ class DebloatSection(Section):
             app.background(lambda: debloat.scan(dev, data, kw, infra, suspended), self._loaded)
 
     def _loaded(self, rows: List[debloat.Row]) -> None:
-        self.query_one(PackageTable).load(rows)
+        table = self.query_one(PackageTable)
+        table.load(rows)
+        self.dapp.load_names([r.pkg for r in rows], table.set_names)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
