@@ -32,9 +32,12 @@ def _get(url: str, opener: Opener, timeout: float = 15) -> object:
 
 
 def parse_version(tag: str) -> Tuple[int, ...]:
-    """'v1.2.3' -> (1, 2, 3); anything that is not a dotted number sorts lowest."""
-    m = re.match(r"v?(\d+(?:\.\d+)*)", tag.strip())
-    return tuple(int(x) for x in m.group(1).split(".")) if m else ()
+    """'v1.2.3' / 'DroidForge-v1.2.3' -> (1, 2, 3), padded so 'v1' == '1.0.0'; no trailing dotted number -> ()."""
+    m = re.search(r"(\d+(?:\.\d+)*)$", tag.strip())
+    if not m:
+        return ()
+    nums = [int(x) for x in m.group(1).split(".")]
+    return tuple(nums + [0] * (3 - len(nums)))
 
 
 def latest(opener: Opener = urllib.request.urlopen) -> str:
