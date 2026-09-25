@@ -278,7 +278,14 @@ def sc_dns(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return dns.dns_plan(dev)
 
 
+def sc_install_hijack(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import privacy
+    from tests.helpers import UAD_SAMPLE
+    return privacy.install_hijack_plan(dev, UAD_SAMPLE, lower_verification=True)
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.features.privacy.install_hijack_plan": sc_install_hijack,
     "droidforge.features.dns.dns_plan": sc_dns,
     "droidforge.features.privacy.telemetry_plan": sc_telemetry,
     "droidforge.features.ads.ads_plan": sc_ads,

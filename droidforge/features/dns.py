@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
+from droidforge.engine import steps
 from droidforge.engine.guard import HOSTNAME
 from droidforge.engine.plan import Plan, Step
 
@@ -33,10 +34,7 @@ def current(device: "Device") -> Tuple[Optional[str], Optional[str]]:
 
 
 def _put(key: str, value: str, prev: Optional[str], label: str) -> Step:
-    undo = f"settings put global {key} {prev}" if prev is not None else f"settings delete global {key}"
-    return Step(label, f"settings put global {key} {value}", [undo], "dns",
-                verify=f"settings get global {key}", expect=rf"^{re.escape(value)}$",
-                touches=[f"setting:global:{key}"])
+    return steps.setting_put("global", key, value, prev, label, "dns")
 
 
 def resolve_host(provider: str, nextdns_id: Optional[str] = None, custom: Optional[str] = None) -> str:

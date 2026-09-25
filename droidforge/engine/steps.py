@@ -93,6 +93,13 @@ def app_locale(p: str, locales: str, prev: str, category: str = "language") -> S
                 [_locale_cmd(p, prev)], category, p, touches=[f"applocale:{p}"])
 
 
+def setting_put(ns: str, key: str, value: str, prev: Optional[str], label: str, category: str) -> Step:
+    """`settings put` (only keys the guard allowlists). Undo puts `prev` back, or deletes the key if it was unset."""
+    undo = f"settings put {ns} {key} {prev}" if prev is not None else f"settings delete {ns} {key}"
+    return Step(label, f"settings put {ns} {key} {value}", [undo], category,
+                verify=f"settings get {ns} {key}", expect=rf"^{_re(value)}$", touches=[f"setting:{ns}:{key}"])
+
+
 def open_screen(action: str, label: str, category: str = "info") -> Step:
     """`am start -a <settings screen>` - an allowed read: opens a screen, changes nothing."""
     return Step(label, f"am start -a {action}", [], category, risk="read")

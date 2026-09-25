@@ -53,3 +53,29 @@ def test_notifications_already_off(sim, phone: FakePhone) -> None:
     phone.packages["com.heytap.browser"].perms["android.permission.POST_NOTIFICATIONS"] = False
     phone.packages["com.heytap.browser"].appops["POST_NOTIFICATION"] = "ignore"
     assert ads.notifications_off_steps(sim, "com.heytap.browser") == []
+
+
+# ---------------------------------------------------------------- P4.3 install hijack
+def test_install_hijack_default(sim, phone: FakePhone) -> None:
+    plan = privacy.install_hijack_plan(sim, UAD_SAMPLE)
+    cmds = [s.cmd for s in plan.steps]
+    assert cmds[0] == "pm disable-user --user 0 com.oplus.appdetail"
+    assert "cmd appops set com.heytap.market POST_NOTIFICATION ignore" in cmds
+    assert not any("verifier" in c for c in cmds) and privacy.LOWERS_PROTECTION not in plan.notes
+    assert executor.run(plan, sim, yes).status == "done"
+    assert not phone.packages["com.oplus.appdetail"].enabled and phone.packages["com.heytap.market"].enabled
+
+
+def test_install_hijack_lower_verification_is_flagged(sim, phone: FakePhone) -> None:
+    plan = privacy.install_hijack_plan(sim, UAD_SAMPLE, lower_verification=True, store_notifications=False)
+    ver = [s for s in plan.steps if "verifier" in s.cmd]
+    assert [s.cmd for s in ver] == ["settings put global verifier_verify_adb_installs 0",
+                                    "settings put global package_verifier_enable 0"]
+    assert all(s.risk == "risky" and s.undo[0].endswith(" 1") for s in ver)
+    assert plan.notes[0].startswith("LOWERS PROTECTION")
+    before = dict(phone.settings["global"])
+    rep = executor.run(plan, sim, yes)
+    assert rep.status == "done" and phone.settings["global"]["package_verifier_enable"] == "0"
+    from droidforge.engine import undo
+    executor.run(undo.undo_plan(rep.results, "undo"), sim, yes)
+    assert phone.settings["global"] == before
