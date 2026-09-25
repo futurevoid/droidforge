@@ -91,7 +91,7 @@ the health gate is not done.
 
 ## Phase 3 - TUI shell
 
-- [ ] **P3.1** (R-12.1, R-2.1) `tui/app.py` layout: header DeviceBar, sidebar sections, main area, collapsible LogPane fed by
+- [x] **P3.1** (R-12.1, R-2.1) `tui/app.py` layout: header DeviceBar, sidebar sections, main area, collapsible LogPane fed by
   `log.py` sink; workers; device picker; `--simulate` flag. Accept: `run_test()` boots on sim.
 - [ ] **P3.2** Widgets: PlanPreview modal (exact cmd + undo + risk badges + notes), TypedConfirm, PackageTable
   (UAD tier, status, description, multi-select, filter), HistoryTable. Accept: pilot test opens preview from a

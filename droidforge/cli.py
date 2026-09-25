@@ -1,4 +1,4 @@
-"""Command-line entry point. No subcommand -> launch the TUI (Phase 3)."""
+"""Command-line entry point. No subcommand -> launch the TUI."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"droidforge {__version__}")
     p.add_argument("--simulate", action="store_true", help="run against the simulated ColorOS phone")
     p.add_argument("--serial", help="adb serial of the phone to use")
+    p.add_argument("--dry-run", action="store_true", help="show and log plans without touching the phone (R-11.5)")
     p.add_argument("--expert", action="store_true",
                    help="expert mode: locked (critical) packages become selectable - one per batch, full package "
                         "name typed, health check and reboot check")
@@ -54,21 +55,26 @@ def cmd_doctor(s: Session) -> int:
     return 0 if rep.healthy else 2
 
 
+def run_tui(args: argparse.Namespace) -> int:
+    from droidforge.tui.app import DroidforgeApp
+    DroidforgeApp(simulate=args.simulate, serial=args.serial, expert=args.expert, dry_run=args.dry_run).run()
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     _setup_logging(args.verbosity)
+    if args.command is None:
+        return run_tui(args)
     sink = console_sink()
     LOG.add_sink(sink)
     try:
-        if args.command is None:
-            print("droidforge: the TUI is not built yet (see docs/PLAN.md). Try: droidforge --simulate doctor",
-                  file=sys.stderr)
-            return 0
         if args.expert:
             print(("\033[41;97m" + EXPERT_BANNER + "\033[0m") if sys.stderr.isatty() else EXPERT_BANNER,
                   file=sys.stderr)
         try:
-            s = SESSION_FACTORY(simulate=args.simulate, serial=args.serial, expert=args.expert)
+            s = SESSION_FACTORY(simulate=args.simulate, serial=args.serial, expert=args.expert,
+                                dry_run=args.dry_run)
         except ConnectError as e:
             LOG.error(str(e))
             return 1
