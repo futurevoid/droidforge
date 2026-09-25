@@ -212,6 +212,8 @@ class FakePhone:
         self.focused = "com.android.launcher"
         self.deviceidle: Set[str] = set()             # user battery-optimisation whitelist
         self.standby: Dict[str, int] = {}             # app standby buckets (default 30 frequent)
+        self.bg_level: Dict[str, str] = {}            # am *-bg-restriction-level (default adaptive_bucket)
+        self.device_config: Dict[str, Dict[str, str]] = {"activity_manager": {}}   # unset keys read "null"
         self.started: List[str] = []                  # `am start` log
         self.logcat: List[str] = [
             "09-25 12:00:00.100  1000  1000 I ActivityManager: Start proc com.android.launcher",
@@ -315,7 +317,9 @@ class FakePhone:
                          if p.present},
             "settings": copy.deepcopy(self.settings), "props": dict(self.props), "imes": dict(self.imes),
             "roles": copy.deepcopy(self.roles), "fw": (self.firewall_chain3, sorted(self.firewall_blocked)),
-            "keepalive": (sorted(self.deviceidle), sorted((k, v) for k, v in self.standby.items() if v != 30)),
+            "keepalive": (sorted(self.deviceidle), sorted((k, v) for k, v in self.standby.items() if v != 30),
+                          sorted(self.bg_level.items())),
+            "device_config": copy.deepcopy(self.device_config),
             "config": self.config.line(), "resolve": dict(self.resolve),
         }
 
@@ -699,6 +703,19 @@ class SimBackend:
         raise Unsupported(" ".join(t))
 
     # ------------------------------------------------------------------ settings
+    def _c_device_config(self, t: List[str]) -> RunResult:
+        verb, ns = t[1], t[2]
+        table = self.phone.device_config.setdefault(ns, {})
+        if verb == "get":
+            return _ok(table.get(t[3], "null"))
+        if verb == "put":
+            table[t[3]] = t[4]
+            return _ok()
+        if verb == "delete":
+            existed = table.pop(t[3], None) is not None
+            return _ok("Successfully deleted" if existed else "Failed to delete")
+        raise Unsupported(" ".join(t))
+
     def _c_settings(self, t: List[str]) -> RunResult:
         verb, ns = t[1], t[2]
         if ns not in self.phone.settings:
@@ -949,6 +966,19 @@ class SimBackend:
             if verb.startswith("get"):
                 return _ok(str(self.phone.standby.get(p.name, 30)))
             self.phone.standby[p.name] = BUCKETS[t[3]]
+            return _ok()
+        if verb in ("get-bg-restriction-level", "set-bg-restriction-level"):
+            if t[2:4] != ["--user", "0"]:
+                raise Unsupported(" ".join(t))
+            p = self._pkg(t[4])
+            if p is None:
+                return _fail(f"Unknown package: {t[4]}", 255)
+            if verb.startswith("get"):
+                return _ok(self.phone.bg_level.get(p.name, "adaptive_bucket"))
+            if t[5] == "adaptive_bucket":
+                self.phone.bg_level.pop(p.name, None)
+            else:
+                self.phone.bg_level[p.name] = t[5]
             return _ok()
         if verb == "start":
             a = t[2:]

@@ -1,9 +1,13 @@
 """Keep-alive for apps the user picks (R-6.3) - stops the system from killing their background work.
 
-Per app (never phone-wide):
+Per app:
     dumpsys deviceidle whitelist +<p>                 (undo -<p>; skipped if already whitelisted)
-    cmd appops set <p> RUN_ANY_IN_BACKGROUND allow    (undo: the previous mode)
+    cmd appops set <p> RUN_ANY_IN_BACKGROUND allow    (undo: the previous mode; same for RUN_IN_BACKGROUND)
     am set-standby-bucket <p> active                  (undo: the previous bucket)
+    am set-bg-restriction-level --user 0 <p> exempted (Android 13+; undo: the previous level)
+    cmd appops set <p> SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS allow   (Android 14+; undo: the previous mode)
+Phone-wide, its own plan so it can be undone on its own (owner opt-in 2026-09-25, never by default):
+    child_process_plan - Developer options "Disable child process restrictions" + the phantom-process cap
 then the app's info page opens: ColorOS keeps "Allow background activity" / "Allow auto launch" under Battery usage,
 which adb cannot set - the user switches them on there. droidforge never touches developer options for this.
 """
@@ -21,6 +25,10 @@ from droidforge.engine.plan import Plan, Step
 if TYPE_CHECKING:  # pragma: no cover
     from droidforge.adb.device import Device
 
+BG_LEVELS = ("unrestricted", "exempted", "adaptive_bucket", "restricted_bucket", "background_restricted",
+             "hibernation")
+CHILD_SETTING = "settings_enable_monitor_phantom_procs"
+PHANTOM_MAX = "2147483647"
 MANUAL = ("On the phone, for each app: App info > Battery usage > turn on 'Allow background activity' and 'Allow "
           "auto launch'; in Recents, lock the app's card. Do NOT turn on any Developer-options switch for this.")
 
@@ -47,16 +55,25 @@ def keepalive_plan(device: "Device", pkgs: Iterable[str], uad: Optional[Mapping[
             plan.steps.append(Step(f"{p}: exempt from battery optimisation", f"dumpsys deviceidle whitelist +{p}",
                                    [f"dumpsys deviceidle whitelist -{p}"], "keepalive", p, risk,
                                    touches=[f"deviceidle:{p}"]))
-        prev = parse.appops(device.read(f"cmd appops get {p}").out).get("RUN_ANY_IN_BACKGROUND")
-        if prev != "allow":
-            st = steps.appop(p, "RUN_ANY_IN_BACKGROUND", "allow", prev, "keepalive", risk)
-            st.label = f"{p}: allow running in the background"
-            plan.steps.append(st)
+        ops = parse.appops(device.read(f"cmd appops get {p}").out)
+        for op, what, min_sdk in (("RUN_ANY_IN_BACKGROUND", "allow running in the background", 0),
+                                  ("RUN_IN_BACKGROUND", "allow background services", 0),
+                                  ("SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS", "exempt from power restrictions", 34)):
+            if device.sdk >= min_sdk and ops.get(op) != "allow":
+                st = steps.appop(p, op, "allow", ops.get(op), "keepalive", risk)
+                st.label = f"{p}: {what}"
+                plan.steps.append(st)
         bucket = parse.standby_bucket(device.out(f"am get-standby-bucket {p}"))
         if bucket and bucket != "active":
             plan.steps.append(Step(f"{p}: standby bucket {bucket} -> active", f"am set-standby-bucket {p} active",
                                    [f"am set-standby-bucket {p} {bucket}"], "keepalive", p, risk,
                                    touches=[f"standby:{p}"]))
+        level = bg_level(device, p)
+        if level and level not in ("exempted", "unrestricted"):
+            plan.steps.append(Step(f"{p}: background restriction {level} -> exempted",
+                                   f"am set-bg-restriction-level --user 0 {p} exempted",
+                                   [f"am set-bg-restriction-level --user 0 {p} {level}"], "keepalive", p, risk,
+                                   touches=[f"bgrestrict:{p}"]))
         plan.steps.append(Step(f"Open app info of {p} (turn on background activity + auto launch there)",
                                f"am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:{p}",
                                category="keepalive", pkg=p, risk="read"))
@@ -65,6 +82,44 @@ def keepalive_plan(device: "Device", pkgs: Iterable[str], uad: Optional[Mapping[
     plan.notes.append(MANUAL)
     plan.notes.append("ColorOS may still kill apps it considers idle; the Battery usage switches are the part that "
                       "matters most.")
+    return plan
+
+
+def bg_level(device: "Device", p: str) -> str:
+    """Android 13+ background restriction level ("" when the build has no such command)."""
+    if device.sdk < 33:
+        return ""
+    r = device.read(f"am get-bg-restriction-level --user 0 {p}")
+    v = r.out.strip()
+    return v if r.ok and v in BG_LEVELS else ""
+
+
+def _devcfg_step(device: "Device", key: str, value: str, label: str) -> Optional[Step]:
+    prev = device.out(f"device_config get activity_manager {key}").strip()
+    if prev == value:
+        return None
+    undo = (f"device_config put activity_manager {key} {prev}" if prev.isdigit()
+            else f"device_config delete activity_manager {key}")
+    return Step(label, f"device_config put activity_manager {key} {value}", [undo], "keepalive", None, "risky",
+                touches=[f"devcfg:activity_manager:{key}"])
+
+
+def child_process_plan(device: "Device") -> Plan:
+    """Phone-wide, owner opt-in: Developer options > "Disable child process restrictions" (Android 12L+) and the
+    phantom-process cap. Matters for apps that start their own processes (Termux, some sync tools)."""
+    plan = Plan(title="Allow unlimited child processes (phone-wide)")
+    cur = device.out(f"settings get global {CHILD_SETTING}").strip()
+    if cur != "false":
+        undo = (f"settings put global {CHILD_SETTING} {cur}" if cur == "true"
+                else f"settings delete global {CHILD_SETTING}")
+        plan.steps.append(Step("Developer option 'Disable child process restrictions' -> on",
+                               f"settings put global {CHILD_SETTING} false", [undo], "keepalive", None, "risky",
+                               touches=[f"setting:global:{CHILD_SETTING}"]))
+    st = _devcfg_step(device, "max_phantom_processes", PHANTOM_MAX, "Child-process cap -> unlimited")
+    if st:
+        plan.steps.append(st)
+    plan.notes.append("Phone-wide (owner opt-in). Undo just this plan with the command printed after it runs, or "
+                      "turn 'Disable child process restrictions' off in Developer options.")
     return plan
 
 

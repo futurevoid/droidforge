@@ -48,10 +48,14 @@ PROPNAME = r"[A-Za-z0-9_.\-]+"
 PROPVAL = r"[A-Za-z0-9_.:/\-+=,]*"
 ZIP = r"/data/local/tmp/[A-Za-z0-9_.\-]+\.zip"
 
-APPOPS = "RUN_IN_BACKGROUND|RUN_ANY_IN_BACKGROUND|POST_NOTIFICATION|SYSTEM_ALERT_WINDOW|GET_USAGE_STATS"
+APPOPS = ("RUN_IN_BACKGROUND|RUN_ANY_IN_BACKGROUND|POST_NOTIFICATION|SYSTEM_ALERT_WINDOW|GET_USAGE_STATS"
+          "|SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS")
 APPOP_MODES = "allow|ignore|deny|default|foreground"
 ROLES = r"android\.app\.role\.(?:BROWSER|SMS|DIALER)"
 BUCKETS = "active|working_set|frequent|rare|restricted"
+BG_LEVELS = "unrestricted|exempted|adaptive_bucket|restricted_bucket|background_restricted|hibernation"
+# owner opt-in 2026-09-25 (SPEC decision log): the phone-wide keep-alive key, nothing else in activity_manager
+AM_KEYS = r"max_phantom_processes"
 
 # `am start -a` is only allowed for these screens (COMMANDS.md Language / Tools "Curated intents" / Health).
 OPENABLE_ACTIONS = (
@@ -217,6 +221,20 @@ RULES: Tuple[Rule, ...] = (
       touches=("deviceidle:{p}",)),
     R("standby-set", rf"am set-standby-bucket (?P<p>{PKG}) (?:{BUCKETS})", ((AP, "Keep-alive"),), True,
       touches=("standby:{p}",)),
+    R("bg-level-get", rf"am get-bg-restriction-level --user 0 {PKG}", ((AP, "Keep-alive"),)),
+    R("bg-level-set", rf"am set-bg-restriction-level --user 0 (?P<p>{PKG}) (?:{BG_LEVELS})", ((AP, "Keep-alive"),),
+      True, touches=("bgrestrict:{p}",)),
+    # owner opt-in 2026-09-25 (SPEC decision log): "Disable child process restrictions" + the phantom-process cap
+    R("phantom-procs", r"settings (?:put global settings_enable_monitor_phantom_procs (?:true|false)"
+                       r"|delete global settings_enable_monitor_phantom_procs)",
+      ((AP, "Keep-alive, phone-wide (owner opt-in)"),), True,
+      touches=("setting:global:settings_enable_monitor_phantom_procs",)),
+    R("am-config-get", rf"device_config get activity_manager (?:{AM_KEYS})",
+      ((AP, "Keep-alive, phone-wide (owner opt-in)"),)),
+    R("am-config-put", rf"device_config put activity_manager (?P<k>{AM_KEYS}) \d{{1,10}}",
+      ((AP, "Keep-alive, phone-wide (owner opt-in)"),), True, touches=("devcfg:activity_manager:{k}",)),
+    R("am-config-delete", rf"device_config delete activity_manager (?P<k>{AM_KEYS})",
+      ((AP, "Keep-alive, phone-wide (owner opt-in)"),), True, touches=("devcfg:activity_manager:{k}",)),
     R("uninstall-user-app", rf"pm uninstall (?P<p>{PKG})", ((AP, "Install APK(s) (host)"),), True,
       touches=("pkg:{p}:installed",), context="user_app"),
     R("shizuku-lib", r"/data/app/[A-Za-z0-9_.~=\-]+(?:/[A-Za-z0-9_.~=\-]+)?/lib/arm64/libshizuku\.so",

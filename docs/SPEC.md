@@ -49,6 +49,10 @@ turned on on Claude's advice). These override anything below that conflicts with
   connection switches it cannot work without (connection help, wireless pairing). It never names, suggests or
   writes any other developer option.
 
+  *Owner exception (2026-09-25, later):* keep-alive may write the developer option **"Disable child process
+  restrictions"** (`settings_enable_monitor_phantom_procs`) and the `activity_manager` key `max_phantom_processes`,
+  in its own opt-in plan (never by default), previewed, with undo to the previous value. The "Disable permission monitoring" switch stays forbidden.
+
 - **P7 Minimal footprint.** A feature touches only the exact package, setting or app-op the user chose.
   No side changes, no "repair" toggles, no bulk passes over every installed package.
 - **P8 Command allowlist.** The executor only sends device commands that match a template in
@@ -333,6 +337,7 @@ are withdrawn by the owner (2026-09-25).
 | Legacy cnrom_fix.py | stripped of language/config features now; retired when droidforge v1 ships |
 | Developer options wording | USB debugging and Wireless debugging may be named (adb connection); every other developer option stays forbidden (P0 exception) |
 | Self-changing settings | A reviewed ignore-list of settings the ROM changes on its own (screen brightness, next alarm): logged and reported, never a stop reason. Display/UI keys (P9b) can never be on it; it grows only from Phase 9 findings |
+| Keep-alive, phone-wide (2026-09-25) | Owner: apps must not be killed. Allowed as a separate opt-in plan, off by default, undoable on its own: "Disable child process restrictions" + the phantom-process cap (the background CPU limit was considered and dropped by the owner). Per-app keep-alive adds RUN_IN_BACKGROUND, the Android 13+ restriction level `exempted` and the Android 14+ power-restriction exemption. Every plan prints its own undo command and recovery script |
 | Publishing v1 | PR to main, then tag v1.0.0 on main |
 | v1 scope (2026-09-25, later) | v1 is published with Phases 0-6 and 8; root mode (Phase 7) moves to v2; the real-device validation (Phase 9) is deferred and runs after v1. The V-status commands stay marked V until then |
 | Incident 2026-09-25 | ColorOS "Disable permission monitoring" switch (turned on on Claude's advice) broke Settings; Reset all settings turned it off. Owner confirmed. Owner order: never break anything, never change what doesn't need changing -> P0, P7-P16, R-11.7 #6. Initially blamed on the legacy language setter (kept forbidden as defence in depth). Owner: droidforge must not change anything it does not need to and must not be able to cause this again -> P7-P12, R-3 rewrite, R-11.7/11.8 |

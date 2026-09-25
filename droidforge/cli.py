@@ -96,7 +96,10 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     w.add_argument("--disable-coloros", action="store_true")
     k = sub.add_parser("keepalive", help="keep picked apps alive in the background (no names: pick from a list)")
     k.add_argument("packages", nargs="*")
-    k.add_argument("--remove", action="store_true")
+    kx = k.add_mutually_exclusive_group()
+    kx.add_argument("--remove", action="store_true")
+    kx.add_argument("--child-processes", action="store_true",
+                    help="phone-wide, own plan: 'Disable child process restrictions' + unlimited phantom processes")
     pp = sub.add_parser("powerperms", help="grant power permissions")
     pp.add_argument("--preset", nargs="*", default=[])
     pp.add_argument("--app")
@@ -260,6 +263,8 @@ def build_plan(args: argparse.Namespace, s: Session) -> Optional[Plan]:
         return apps.install_plan(dev, [Path(a) for a in args.apks])
     if c == "swap":
         return defaults.swap_plan(dev, args.function, args.disable_coloros, data, ex)
+    if c == "keepalive" and args.child_processes:
+        return keepalive.child_process_plan(dev)
     if c == "keepalive":
         pkgs = args.packages or pick_keepalive(dev, args.remove)
         if not pkgs:
@@ -350,6 +355,11 @@ def run_cli_plan(s: Session, plan: Plan, yes: bool, allow_locked: Sequence[str] 
     if refused:
         print(ascii_safe("The ROM refused to disable: " + ", ".join(p for p in refused if p)
                          + ". Try: droidforge debloat force <package> (suspend -> remove -> firewall + neuter)."))
+    ids = [r.history_id for r in rep.results if r.history_id and r.ok and not r.dry_run]
+    if ids:
+        print(f"Undo just this plan: droidforge undo {' '.join(ids)}")
+    if rep.recovery:
+        print(ascii_safe(f"Recovery script (runs the undo from any shell with adb): {rep.recovery}"))
     if rep.offer_reboot:
         print("This was a risky plan: reboot the phone and run 'droidforge doctor' to re-check (R-11.9).")
     return 0
