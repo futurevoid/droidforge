@@ -129,6 +129,7 @@ class FakePhone:
         self.started: List[str] = []                  # `am start` log
         self.side_effects: Dict[str, Callable[["FakePhone"], None]] = {}
         self.log: List[str] = []                      # every shell command received
+        self.host_log: List[str] = []                 # host commands (simulated, never executed)
         self.uid_next = 10100
 
     # ------------------------------------------------------------------ seed helpers
@@ -378,6 +379,13 @@ class SimBackend:
         if args[0] == "get-state":
             return _ok("device")
         return self._unsupported("adb " + " ".join(args))
+
+    def run_host(self, args: List[str], timeout: float = 600) -> RunResult:
+        """Host commands in --simulate mode are recorded, never executed on this machine."""
+        self.phone.host_log.append(" ".join(args))
+        if args[:1] == ["adb"]:
+            return self.run(args[1:], timeout)
+        return _ok(f"sim: host command recorded: {' '.join(args)}")
 
     def _unsupported(self, cmd: str) -> RunResult:
         return R(EXIT_NOT_FOUND, "", f"sim: unsupported: {cmd}", 0)

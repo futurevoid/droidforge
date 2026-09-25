@@ -43,7 +43,7 @@ the health gate is not done.
 - [x] **P1.3** (P0, P11, R-11.7) `engine/health.py`: probes + baseline compare. Accept: `break_ui()` on the sim is
   reported as 2+ regressions; a healthy sim reports none; sim `permission_monitoring=True` is reported with the
   "turn it off" message even when the baseline already had it on.
-- [ ] **P1.4** (R-11.1, R-11.5, P1, P5, P13, P15) `engine/plan.py` (`Step.touches`) + `engine/executor.py`: guard
+- [x] **P1.4** (R-11.1, R-11.5, P1, P5, P13, P15) `engine/plan.py` (`Step.touches`) + `engine/executor.py`: guard
   -> confirm -> baseline health+snapshot -> recovery script -> batches of <=5 with diff+health after each ->
   stop on first regression -> undo offer. Accept: (a) dry-run touches nothing; (b) fallback escalation works;
   (c) a sim `side_effects` rule that flips an undeclared setting is caught and the plan stops after that batch;
