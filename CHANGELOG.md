@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.2 - 2026-09-25
+
+- Fixed: Enter (pick / unpick) in the debloat table sent the cursor back to the top - it rebuilt the whole
+  table. Picking, select-all and clear now change only the checkbox cells; reloading or filtering keeps the
+  cursor on the same package.
+- Fixed: key presses seemed lost in the keep-alive / firewall app lists while names were loading - each batch of
+  names rebuilt the list. Names now update the rows in place; names are searchable.
+- Fixed: short freezes while adb works - the log pane wrote each line separately on the screen thread. It now
+  writes at most 60 lines per 0.1 s refresh, in one call.
+
 ## 1.1.1 - 2026-09-25
 
 - Fixed: the TUI froze while adb was working. Command output on screen is capped (200 lines per command at

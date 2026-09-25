@@ -13,8 +13,8 @@ STYLE = {"cmd": "cyan", "exit": "dim", "out": "dim", "more": "dim", "err": "yell
          "info": "cyan", "ok": "green", "warn": "yellow", "error": "bold red"}
 
 
-LINES_PER_TICK = 250   # per 0.1 s tick
-MAX_PENDING = 2000
+LINES_PER_TICK = 60    # per 0.1 s tick - leaves the UI thread free for key presses
+MAX_PENDING = 1000
 
 
 class LogPane(RichLog):
@@ -46,6 +46,7 @@ class LogPane(RichLog):
         if dropped:
             self.write(Text(f"    ... {dropped} log line(s) skipped to keep the screen responsive - full text in "
                             "the debug log", style="dim"))
-        for _ in range(min(len(self.pending), LINES_PER_TICK)):
-            line = self.pending.popleft()
-            self.write(Text(line.text, style=STYLE.get(line.kind, "")))
+        n = min(len(self.pending), LINES_PER_TICK)
+        if n:   # one write per tick: a write per line cost the screen thread more than the lines themselves
+            batch = [self.pending.popleft() for _ in range(n)]
+            self.write(Text("\n").join(Text(ln.text, style=STYLE.get(ln.kind, "")) for ln in batch))
