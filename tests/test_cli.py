@@ -77,3 +77,35 @@ def test_reapply_after_ota(ph: FakePhone) -> None:
     ph.packages["com.heytap.mcs"].enabled = True
     ph.props["ro.build.fingerprint"] = "realme/RMX8899/new:16/NEW/9:user/release-keys"
     assert run("reapply") == 0 and not ph.packages["com.heytap.mcs"].enabled
+
+
+# ---------------------------------------------------------------- P8.1
+def test_allow_locked_with_expert(ph: FakePhone) -> None:
+    p = "com.android.ims.rcsservice"
+    assert run("debloat", "disable", p) == 1                                  # not even selectable without --expert
+    assert cli.main(["-q", "--simulate", "--yes", "--expert", "--allow-locked", p, "debloat", "disable", p]) == 0
+    assert not ph.packages[p].enabled
+
+
+def test_allow_locked_does_not_answer_other_typed_strings(ph: FakePhone, monkeypatch: pytest.MonkeyPatch) -> None:
+    def no_tty(q: str) -> str:
+        raise EOFError
+    monkeypatch.setattr("builtins.input", no_tty)
+    assert cli.main(["-q", "--simulate", "--yes", "--allow-locked", "I UNDERSTAND", "debloat", "disable",
+                     "com.oplus.camera"]) == 1                                # guarded: typed string not given
+    assert ph.packages["com.oplus.camera"].enabled
+
+
+def test_export_apply_import_legacy(ph: FakePhone, tmp_path: Path) -> None:
+    assert run("debloat", "disable", "com.heytap.market") == 0
+    out = tmp_path / "neo8.json"
+    assert run("export", "--profile", str(out)) == 0
+    data = json.loads(out.read_text())
+    assert data["disabled"] == ["com.heytap.market"] and "serial" not in data
+    assert run("debloat", "enable", "com.heytap.market") == 0
+    assert run("apply", "--profile", str(out)) == 0 and not ph.packages["com.heytap.market"].enabled
+    legacy = tmp_path / "cnrom_state.json"
+    legacy.write_text(json.dumps({"removed": ["com.opos.cs"], "english": ["com.android.settings"]}))
+    assert run("import-legacy", str(legacy)) == 0 and not ph.packages["com.opos.cs"].user0
+    assert ph.packages["com.android.settings"].locales == ""
+    assert run("apply", "--profile", str(tmp_path / "missing.json")) == 2

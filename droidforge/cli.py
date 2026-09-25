@@ -6,7 +6,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional, Sequence
 
 from droidforge import __version__, config
 from droidforge.engine.health import RESET_ALL_SETTINGS
@@ -52,6 +52,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="commands, exit codes, timing, first 15 lines")
     lv.add_argument("--ultra", dest="verbosity", action="store_const", const=3, help="everything (default)")
     p.add_argument("-y", "--yes", action="store_true", help="skip the [y/N] prompt (typed strings still needed)")
+    p.add_argument("--allow-locked", default="", metavar="PKG,PKG",
+                   help="with --expert: these locked package names count as typed (P1); other typed strings are "
+                        "still asked")
     sub = p.add_subparsers(dest="command")
     sub.add_parser("doctor", help="read-only health and capability report (never changes the phone)")
     sub.add_parser("fix", help="breakage check vs the last healthy baseline; offers the repair plan (R-12.5)")
@@ -106,6 +109,12 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     rg = sub.add_parser("region", help="open Regional preferences or Date & time")
     rg.add_argument("action", choices=["regional", "datetime"])
     sub.add_parser("reapply", help="re-apply the saved profile (after an OTA update)")
+    ap = sub.add_parser("apply", help="apply an exported profile to this phone (previewed)")
+    ap.add_argument("--profile", required=True)
+    ex = sub.add_parser("export", help="export this phone's profile (without device identity)")
+    ex.add_argument("--profile", required=True)
+    il = sub.add_parser("import-legacy", help="apply the package keys of a legacy cnrom_state.json (previewed)")
+    il.add_argument("path")
     sub.add_parser("history", help="list the history timeline")
     u = sub.add_parser("undo", help="undo history entries")
     u.add_argument("ids", nargs="+")
@@ -133,14 +142,20 @@ def preview_lines(plan: Plan) -> List[str]:
     return out
 
 
-def cli_confirm(yes: bool, ask: Optional[Callable[[str], str]] = None) -> Callable[[Plan], Confirmation]:
-    """P1 for the CLI: print the exact commands and undo, ask [y/N] (--yes skips), ask for every typed string."""
+def cli_confirm(yes: bool, ask: Optional[Callable[[str], str]] = None,
+                allow_locked: Sequence[str] = ()) -> Callable[[Plan], Confirmation]:
+    """P1 for the CLI: print the exact commands and undo, ask [y/N] (--yes skips), ask for every typed string
+    (locked package names listed in --allow-locked count as typed)."""
     def hook(plan: Plan) -> Confirmation:
         prompt = ask or input
         for line in preview_lines(plan):
             print(ascii_safe(line))
         typed = []
+        locked_pkgs = {st.pkg for st in plan.steps if st.risk == "locked" and st.pkg}
         for t in plan.typed:
+            if t in allow_locked and t in locked_pkgs:   # only locked package names, never other phrases
+                typed.append(t)
+                continue
             try:
                 typed.append(prompt(f"Type exactly '{t}' to confirm: "))
             except EOFError:
@@ -263,6 +278,14 @@ def build_plan(args: argparse.Namespace, s: Session) -> Optional[Plan]:
         from droidforge.features import ota
         rep = ota.check(dev, s.profile, data, ex)
         return rep.plan if rep.plan is not None else s.profile.reapply(dev, title="Re-apply saved changes")
+    if c == "apply":
+        import json
+
+        from droidforge.engine.profile import import_plan
+        return import_plan(json.loads(Path(args.profile).read_text(encoding="utf-8")), dev)
+    if c == "import-legacy":
+        from droidforge.engine.profile import legacy_import_plan
+        return legacy_import_plan(Path(args.path), dev)
     if c == "undo":
         return s.history.undo(args.ids)
     if c == "rollback":
@@ -290,7 +313,7 @@ def pick_keepalive(dev: "Device", remove: bool, ask: Optional[Callable[[str], st
     return keepalive.parse_selection(text, items)
 
 
-def run_cli_plan(s: Session, plan: Plan, yes: bool) -> int:
+def run_cli_plan(s: Session, plan: Plan, yes: bool, allow_locked: Sequence[str] = ()) -> int:
     """0 done, 1 cancelled / nothing to do, 2 refused or stopped (the phone changed unexpectedly)."""
     from droidforge.engine import executor
     from droidforge.features import fix
@@ -298,8 +321,8 @@ def run_cli_plan(s: Session, plan: Plan, yes: bool) -> int:
         for line in [plan.title] + [f" ! {n}" for n in plan.notes]:
             print(ascii_safe(line))
         return 1
-    rep = executor.run(plan, s.device, cli_confirm(yes), dry_run=s.dry_run, history=s.history, profile=s.profile,
-                       expert_mode=s.expert)
+    rep = executor.run(plan, s.device, cli_confirm(yes, allow_locked=allow_locked), dry_run=s.dry_run,
+                       history=s.history, profile=s.profile, expert_mode=s.expert)
     for r in rep.results:
         mark = "ok  " if r.ok else "FAIL"
         print(ascii_safe(f"[{mark}] {r.step.label}" + ("" if r.ok else f" -> {r.err or r.out}")))
@@ -426,6 +449,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             return cmd_fix(s, args.yes)
         if args.command == "history":
             return cmd_history(s)
+        if args.command == "export":
+            import json
+            Path(args.profile).write_text(json.dumps(s.profile.export(), indent=2, sort_keys=True), encoding="utf-8")
+            print(f"Profile exported to {args.profile}")
+            return 0
         if args.command == "audit":
             return cmd_audit(s, args.what, args.json, args.all)
         if args.command == "uad-update":
@@ -435,12 +463,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0 if ok else 1
         try:
             plan = build_plan(args, s)
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError, OSError) as e:
             LOG.error(str(e))
             return 2
         if plan is None:
             return 1
-        code = run_cli_plan(s, plan, args.yes)
+        locked = [x.strip() for x in args.allow_locked.split(",") if x.strip()]
+        code = run_cli_plan(s, plan, args.yes, locked)
         if args.command == "reapply" and code == 0:
             from droidforge.features import ota
             ota.acknowledge(s.profile, s.device)
