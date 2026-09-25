@@ -126,7 +126,8 @@ R = Rule
 RULES: Tuple[Rule, ...] = (
     # ------------------------------------------------------------ reads
     R("getprop", rf"getprop(?: (?P<prop>{PROPNAME}))?",
-      ((DI, "SDK / release / build"), (DI, "Brand / model"), (DI, "ROM family"), (LA, "Read device locales"))),
+      ((DI, "SDK / release / build"), (DI, "Brand / model"), (DI, "ROM family"), (LA, "Read device locales"),
+       (HP, "Boot completed (R-11.9)"))),
     R("pm-list", r"pm list packages(?: -[dus3Ufe]+)*", ((DI, "Package lists"), (AU, "UID map"))),
     R("focused", r"dumpsys window \| grep -E 'mCurrentFocus\|mFocusedApp'", ((DI, "Focused app"),)),
     R("resolve-home", r"cmd package resolve-activity --brief -a android\.intent\.action\.MAIN "
@@ -231,6 +232,9 @@ RULES: Tuple[Rule, ...] = (
       touches=("host:droidforge",)),
     R("scrcpy", rf"scrcpy -s {SERIAL}(?: --turn-screen-off| --stay-awake| --record {HOSTPATH})*",
       ((TO, "scrcpy (host)"),), host=True),
+    R("reboot", rf"adb -s {SERIAL} reboot", ((HO, "Reboot check (R-11.9)"),), True, True,
+      touches=("reboot", "setting:global:boot_count")),
+    R("wait-for-device", rf"adb -s {SERIAL} wait-for-device", ((HO, "Reboot check (R-11.9)"),), host=True),
     R("logcat-stream", rf"adb -s {SERIAL} logcat -v threadtime(?: --pid=[0-9]+)?(?: '\*:[VDIWEF]')?",
       ((TO, "logcat (host stream)"),), host=True),
 )

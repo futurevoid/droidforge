@@ -142,6 +142,9 @@ class FakePhone:
         self.log: List[str] = []                      # every shell command received
         self.host_log: List[str] = []                 # host commands (simulated, never executed)
         self.uid_next = 10100
+        self.boots = 0
+        self.boot_polls_left = 0
+        self.on_boot: List[Callable[["FakePhone"], None]] = []   # fault injection "at boot"
 
     # ------------------------------------------------------------------ seed helpers
     def add(self, name: str, system: bool = True, signer: Optional[str] = None, uid: Optional[int] = None,
@@ -174,6 +177,19 @@ class FakePhone:
         self.resolve[ACTION_PERMS] = AOSP_PERMS
         self.config.oem["mMaterialColor"] = "0"
         self.permission_monitoring_disabled = True
+
+    def reboot(self) -> None:
+        """Instant reboot: boot hooks run, the crash buffer and running apps reset, boot_count increments, and
+        `sys.boot_completed` reads empty for a few polls (the executor must wait for it)."""
+        self.boots += 1
+        self.crashes = []
+        for p in self.packages.values():
+            p.running = p.name in ("android", "com.android.systemui", "com.android.settings", "com.android.launcher")
+        g = self.settings["global"]
+        g["boot_count"] = str(int(g.get("boot_count", "0")) + 1)
+        self.boot_polls_left = 2
+        for hook in list(self.on_boot):
+            hook(self)
 
     def crash(self, pkg: str) -> None:
         n = len(self.crashes)
@@ -265,6 +281,7 @@ def neo8_cn() -> FakePhone:
         "ro.build.fingerprint": "realme/RMX8899/RE60B2L1:16/BP2A.250605.015/V.2a4f1b-1c2d3e:user/release-keys",
         "ro.build.version.oplusrom": "V16.0.0", "ro.product.locale": "zh-CN", "sys.boot_completed": "1",
     })
+    ph.settings["global"]["boot_count"] = "7"
     ph.add("android", uid=1000, signer="platform", running=True)
     for n in UI_INFRA_SEED[1:]:
         ph.add(n, signer="platform" if n.startswith("com.android") else "oem",
@@ -390,6 +407,11 @@ class SimBackend:
             return _ok(f"List of devices attached\n{self.phone.serial}\tdevice")
         if args[0] == "get-state":
             return _ok("device")
+        if args == ["reboot"]:
+            self.phone.reboot()
+            return _ok()
+        if args == ["wait-for-device"]:
+            return _ok()
         return self._unsupported("adb " + " ".join(args))
 
     def run_host(self, args: List[str], timeout: float = 600) -> RunResult:
@@ -472,6 +494,9 @@ class SimBackend:
         return _ok(" ".join(t[1:]))
 
     def _c_getprop(self, t: List[str]) -> RunResult:
+        if t[1:] == ["sys.boot_completed"] and self.phone.boot_polls_left > 0:
+            self.phone.boot_polls_left -= 1
+            return _ok("")
         if len(t) == 1:
             return _ok("\n".join(f"[{k}]: [{v}]" for k, v in sorted(self.phone.props.items())))
         return _ok(self.phone.props.get(t[1], ""))

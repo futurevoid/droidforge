@@ -147,6 +147,7 @@ Nothing here. All display/UI commands moved to "Forbidden".
 | adb / scrcpy install | `sudo pacman -S android-tools` / `sudo pacman -S scrcpy` | S |
 | Notification | `notify-send -a droidforge "<title>" "<body>"` | S |
 | Self-update | GitHub API `https://api.github.com/repos/futurevoid/droidforge/releases/latest`; pipx: `pipx upgrade droidforge`; AUR: `yay -S droidforge-git` | S |
+| Reboot check (R-11.9) | `adb -s <serial> reboot` (offered after risky plans, confirmed like any plan), then `adb -s <serial> wait-for-device` | S ([adb docs](https://developer.android.com/tools/adb)) |
 
 ## Health probes (R-11.7) - read-only
 
@@ -159,6 +160,7 @@ Nothing here. All display/UI commands moved to "Forbidden".
 | Night mode / font | `cmd uimode night`, `settings get system font_scale` | L |
 | IME / launcher | `settings get secure default_input_method`, `cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME` | L |
 | Crashes | `logcat -b crash -d -t 200` | L |
+| Boot completed (R-11.9) | `getprop sys.boot_completed` -> `1` once the phone has finished booting | S (AOSP) |
 | Process alive | `pidof com.android.systemui`, `pidof com.android.settings` | L |
 | Permission-monitoring switch off | read the setting/prop behind Developer options > "Disable permission monitoring" (key unknown yet: found in Phase 9 by the owner flipping it while droidforge diffs `settings list system/secure/global` + `getprop`; droidforge only reads). Until then the simulator exposes it as the placeholder `settings get global droidforge_placeholder_permission_monitoring_disabled` (`1` = switch on); on a real phone that read returns `null` and the probe reports "unknown", never "healthy" | V |
 | Open Developer options (for the user to turn the switch off) | `am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS` | S |

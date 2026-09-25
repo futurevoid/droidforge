@@ -15,6 +15,7 @@ Dry-run: nothing is sent; steps are logged as "(dry-run)" and history marks them
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Protocol, Sequence, Tuple, Union
@@ -31,6 +32,8 @@ if TYPE_CHECKING:  # pragma: no cover
     from droidforge.engine.profile import Profile
 
 ERR_RE = re.compile(r"(?i)\b(error|exception|failure|unknown package|not installed)\b")
+BOOT_POLL_S = 2.0
+BOOT_FAIL = "the phone did not come back after the reboot"
 OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:")
 
 ConfirmHook = Callable[[Plan], Union[bool, Confirmation]]
@@ -67,6 +70,11 @@ class RunReport:
     def broke_something(self) -> bool:
         return bool(self.regressions or self.undeclared)
 
+    @property
+    def offer_reboot(self) -> bool:
+        """R-11.9: after risky plans (system debloat, keyboard/default apps, expert, root) offer a reboot check."""
+        return self.status == "done" and (self.plan.reboot_check or self.plan.expert)
+
 
 def succeeded(r: RunResult) -> bool:
     return r.exit == 0 and not ERR_RE.search(f"{r.out} {r.err}")
@@ -93,7 +101,12 @@ def _send(step: Step, device: "Device") -> RunResult:
 
 def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = False,
         history: Optional[History] = None, recovery_dir: Optional[Path] = None,
-        profile: Optional["Profile"] = None, expert_mode: bool = False) -> RunReport:
+        profile: Optional["Profile"] = None, expert_mode: bool = False,
+        baseline: Optional[Tuple[HealthReport, Snapshot]] = None, declared_before: Sequence[str] = (),
+        prior_results: Sequence[StepResult] = (), sleep: Callable[[float], None] = time.sleep,
+        boot_timeout: float = 240) -> RunReport:
+    """See the module docstring. `baseline` / `declared_before` / `prior_results` let a follow-up plan (the R-11.9
+    reboot check) be judged against an earlier plan's pre-plan state."""
     log = device.log
     rep = RunReport(plan=plan, batches_total=len(plan.batches()))
 
@@ -127,9 +140,13 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
         return rep
 
     # 3. baseline (P11, P10)
-    scope = plan.packages()
-    rep.baseline_health = base_h = health.run(device)
-    rep.baseline_snapshot = base_s = snapshot.take(device, scope=scope)
+    if baseline is not None:
+        base_h, base_s = baseline
+        scope = sorted(set(plan.packages()) | set(base_s.details))
+    else:
+        scope = plan.packages()
+        base_h, base_s = health.run(device), snapshot.take(device, scope=scope)
+    rep.baseline_health, rep.baseline_snapshot = base_h, base_s
     rep.pre_failing = base_h.failing
     for p in rep.pre_failing:
         log.warn(f"Already failing before this plan: {p.label} = {p.value or '-'}"
@@ -140,7 +157,12 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
     rep.recovery = str(recovery.write(plan, device.serial or "device", rdir))
     log.trace(f"recovery script written: {rep.recovery}")
 
-    declared: List[str] = []
+    declared: List[str] = list(declared_before)
+
+    def waiter(stage: Step) -> bool:
+        if stage.host and guard.classify(stage.cmd, True) == "reboot":
+            return wait_for_boot(device, sleep, boot_timeout)
+        return True
 
     def gate() -> bool:
         """Blast-radius diff + health compare vs the baseline. True = healthy, continue."""
@@ -159,7 +181,7 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
     for n, batch in enumerate(plan.batches(), 1):
         log.trace(f"batch {n}/{rep.batches_total}: {len(batch)} step(s)")
         for step in batch:
-            res = _run_step(step, device, declared, gate)
+            res = _run_step(step, device, declared, gate, waiter)
             if history is not None:
                 res.history_id = history.record(plan, res, device)
             rep.results.append(res)
@@ -170,6 +192,9 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
             if rep.regressions or rep.undeclared:
                 stopped = True  # a stage gate inside the escalation found damage
                 break
+            if res.err == BOOT_FAIL:
+                stopped, rep.error = True, BOOT_FAIL  # nothing to check against an offline phone
+                break
         rep.batches_run = n
         if stopped or not gate():
             stopped = True
@@ -178,10 +203,12 @@ def run(plan: Plan, device: "Device", confirm: ConfirmHook, *, dry_run: bool = F
     # 6. stop + undo offer
     if stopped:
         rep.status = "stopped"
-        rep.undo_plan = undo.repair_plan(rep.results, rep.undeclared, device, f"Undo: {plan.title}")
+        rep.undo_plan = undo.repair_plan(list(prior_results) + rep.results, rep.undeclared, device,
+                                         f"Undo: {plan.title}")
         rep.advice = health.advice(rep.regressions)
-        log.error(f"STOPPED after batch {rep.batches_run}/{rep.batches_total}: the phone changed in a way this "
-                  f"plan did not declare. Later batches were not sent.")
+        log.error(f"STOPPED after batch {rep.batches_run}/{rep.batches_total}: "
+                  + (rep.error if rep.error else "the phone changed in a way this plan did not declare")
+                  + ". Later batches were not sent.")
         for r in rep.regressions:
             log.error(f"  health: {r}")
         for c in rep.undeclared:
@@ -208,7 +235,24 @@ def _default_recovery_dir() -> Path:
     return config.paths().sub("recovery")
 
 
-def _run_step(step: Step, device: "Device", declared: List[str], gate: Callable[[], bool]) -> StepResult:
+def wait_for_boot(device: "Device", sleep: Callable[[float], None] = time.sleep, timeout: float = 240) -> bool:
+    """After `adb reboot`: wait-for-device, then poll `getprop sys.boot_completed` until it reads 1."""
+    wait = f"adb -s {device.serial} wait-for-device"
+    guard.check_command(wait, device, host=True)
+    run_host(wait, device, timeout=timeout)
+    device.forget_props()
+    device.invalidate("reboot")
+    for _ in range(max(1, int(timeout / BOOT_POLL_S))):
+        if device.read("getprop sys.boot_completed").out.strip() == "1":
+            device.log.ok("Phone finished booting")
+            return True
+        sleep(BOOT_POLL_S)
+    device.log.error(f"The phone did not report boot completed within {timeout:g}s")
+    return False
+
+
+def _run_step(step: Step, device: "Device", declared: List[str], gate: Callable[[], bool],
+              waiter: Callable[[Step], bool] = lambda s: True) -> StepResult:
     stages = [step] + list(step.fallbacks)
     res = StepResult(step=step, requested=step, ok=False)
     for i, stage in enumerate(stages):
@@ -227,8 +271,11 @@ def _run_step(step: Step, device: "Device", declared: List[str], gate: Callable[
         res.attempts.append(stage.cmd)
         res.step, res.exit, res.out, res.err = stage, r.exit, r.out, r.err
         if succeeded(r):
-            res.ok = True
             res.applied.append(stage)
+            res.ok = waiter(stage)
+            if not res.ok:
+                res.err = BOOT_FAIL
+                return res
             if stage.verify:
                 v = device.read(stage.verify)
                 res.verified = bool(re.search(stage.expect, v.out)) if stage.expect else v.ok

@@ -21,9 +21,10 @@ import pytest
 import droidforge
 from droidforge.adb.device import Device
 from droidforge.adb.sim import IME_BAIDU, FakePhone
-from droidforge.engine import executor, guard, snapshot, undo
+from droidforge.engine import executor, guard, safety, snapshot, undo
 from droidforge.engine.history import History
-from droidforge.engine.plan import Plan
+from droidforge.engine.plan import Confirmation, Plan, is_ephemeral
+from droidforge.engine.reboot import reboot_plan
 from droidforge.engine.profile import Profile, import_plan, legacy_import_plan
 from droidforge.engine.snapshot import Change
 from tests.helpers import TELEMETRY, disable_plan, yes
@@ -115,7 +116,19 @@ def sc_repair_plan(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return undo.repair_plan(rep.results, rep.undeclared, dev, "Repair")
 
 
+def sc_reboot_plan(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    return reboot_plan(phone.serial)
+
+
+def sc_make_expert(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.engine import steps
+    return safety.make_expert(Plan("Expert", [steps.disable("com.android.ims.rcsservice")]),
+                              ["com.android.ims.rcsservice"])
+
+
 SCENARIOS: Dict[str, Scenario] = {
+    "droidforge.engine.reboot.reboot_plan": sc_reboot_plan,
+    "droidforge.engine.safety.make_expert": sc_make_expert,
     "droidforge.engine.profile.Profile.reapply": sc_profile_reapply,
     "droidforge.engine.profile.import_plan": sc_import_plan,
     "droidforge.engine.profile.legacy_import_plan": sc_legacy_import,
@@ -135,6 +148,15 @@ def test_every_plan_builder_is_registered() -> None:
     assert not stale, f"registered builders that no longer exist: {sorted(stale)}"
 
 
+def confirm_all(plan: Plan) -> Confirmation:
+    """The user confirms and types every string the plan asks for."""
+    return Confirmation(True, list(plan.typed))
+
+
+def no_sleep(_: float) -> None:
+    pass
+
+
 def _writes(plan: Plan) -> List:
     return [s for s in plan.steps if s.risk != "read"]
 
@@ -152,13 +174,13 @@ def test_invariants(name: str, sim: Device, phone: FakePhone, tmp_path: Path) ->
             if st.risk == "read":
                 continue
             assert st.touches, f"{name}: {st.cmd} declares no touches"
-            if not all(t.startswith("proc:") for t in st.touches):
+            if not all(is_ephemeral(t) for t in st.touches):
                 assert st.undo, f"{name}: {st.cmd} has no undo"
 
     # execute: only declared keys change (P5, P10), no health regression (P11)
     scope = plan.packages()
     before = snapshot.take(sim, scope=scope)
-    rep = executor.run(plan, sim, yes)
+    rep = executor.run(plan, sim, confirm_all, expert_mode=plan.expert, sleep=no_sleep)
     assert rep.status == "done", (name, rep.error, [str(r) for r in rep.regressions], [str(c) for c in rep.undeclared])
     assert rep.undeclared == [] and rep.regressions == []
     after = snapshot.take(sim, scope=scope)
@@ -167,8 +189,10 @@ def test_invariants(name: str, sim: Device, phone: FakePhone, tmp_path: Path) ->
     assert any(r.effect == "changed" for r in rep.results), f"{name}: nothing observable changed"
 
     # undo restores the original snapshot exactly (P2)
-    back = executor.run(undo.undo_plan(rep.results, f"Undo {plan.title}"), sim, yes)
+    back_plan = undo.undo_plan(rep.results, f"Undo {plan.title}")
+    back_plan.expert, back_plan.typed = plan.expert, list(plan.typed)
+    back = executor.run(back_plan, sim, confirm_all, expert_mode=plan.expert, sleep=no_sleep)
     assert back.status == "done", (name, back.error, [str(r) for r in back.regressions])
     restored = snapshot.take(sim, scope=scope)
-    remaining: List[Change] = snapshot.diff(before, restored)
+    remaining: List[Change] = [c for c in snapshot.diff(before, restored) if not is_ephemeral(c.key)]
     assert remaining == [], f"{name}: undo left differences: {[str(c) for c in remaining]}"

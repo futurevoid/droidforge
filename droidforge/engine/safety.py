@@ -186,3 +186,44 @@ def check_plan(plan: Plan, ctx: SafetyContext, expert_mode: bool = False) -> Non
                 raise GuardError(s.cmd, f"{p} is locked ({v.reason}) - expert mode only (R-4.3)")
             if p not in plan.typed:
                 raise GuardError(s.cmd, f"{p} is locked - its full package name must be typed")
+
+
+# ---------------------------------------------------------------------- expert mode (R-4.3)
+@dataclass
+class Selection:
+    allowed: List[str] = field(default_factory=list)
+    rejected: Dict[str, str] = field(default_factory=dict)   # pkg -> why it cannot be selected
+    locked: List[str] = field(default_factory=list)          # allowed only because expert mode is on
+
+
+def select(pkgs: Iterable[str], ctx: SafetyContext, expert_mode: bool = False) -> Selection:
+    """What may enter a plan. Locked packages only with expert mode on - no other way in."""
+    sel = Selection()
+    for p in dict.fromkeys(pkgs):
+        v = verdict(p, ctx)
+        if v.locked and not expert_mode:
+            sel.rejected[p] = f"locked ({v.reason}) - start droidforge with --expert to select it"
+            continue
+        sel.allowed.append(p)
+        if v.locked:
+            sel.locked.append(p)
+    return sel
+
+
+def make_expert(plan: Plan, locked: Iterable[str]) -> Plan:
+    """Mark a plan that touches locked packages: batches of one, each full name typed, reboot check offered."""
+    locked = list(locked)
+    if locked:
+        plan.expert = True
+        plan.reboot_check = True
+        for s in plan.steps:
+            if targets(s) & set(locked):
+                s.risk = "locked"
+        for p in locked:
+            if p not in plan.typed:
+                plan.typed.append(p)
+        plan.notes.insert(0, "EXPERT MODE: this plan touches locked packages. It runs one package per batch with "
+                             "the health check in between; type each full package name to confirm. A reboot check "
+                             "is offered afterwards.")
+    return plan
+

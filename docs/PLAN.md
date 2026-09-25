@@ -63,10 +63,13 @@ the health gate is not done.
   the original. Grows with each phase; a builder that is not registered fails the suite.
 - [x] **P1.9** `features/doctor.py` (R-2.8): read-only report incl. health probes; on failure recommends Settings >
   Reset all settings. Accept: `break_ui()` sim -> doctor prints the regressions and the advice, sends no writes.
-- [ ] **P1.10** (R-4.3, R-11.9) Expert mode + reboot check: `--expert` flag / TUI toggle with red banner; locked
+- [x] **P1.10** (R-4.3, R-11.9) Expert mode + reboot check: `--expert` flag / TUI toggle with red banner; locked
   packages selectable only then, one per batch, typed name; reboot check waits for `sys.boot_completed`, re-runs
   health + snapshot vs pre-plan baseline. Accept: without `--expert` a locked package cannot enter a plan even
   via CLI; the sim reboot check catches a regression injected "at boot".
+  - Done in P1.10: `--expert` CLI flag + ASCII banner, `Session.expert`, `safety.select/make_expert`, executor
+    `expert_mode`, `engine/reboot.py`. The TUI toggle + red banner is built with the TUI itself (P3.1 header,
+    P3.3 screens) on top of the same `Session.expert` flag.
 
 ## Phase 2 - Port legacy features
 

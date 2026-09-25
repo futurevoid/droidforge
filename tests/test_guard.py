@@ -130,6 +130,8 @@ EXAMPLES: Dict[str, str] = {
     "self-update": "pipx upgrade droidforge",
     "scrcpy": f"scrcpy -s {SIM_SERIAL} --turn-screen-off --stay-awake",
     "logcat-stream": f"adb -s {SIM_SERIAL} logcat -v threadtime --pid=1234 '*:E'",
+    "reboot": f"adb -s {SIM_SERIAL} reboot",
+    "wait-for-device": f"adb -s {SIM_SERIAL} wait-for-device",
 }
 
 CONTEXT_FREE = {n for n in EXAMPLES if not next(r for r in guard.RULES if r.name == n).context}
