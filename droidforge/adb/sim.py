@@ -143,6 +143,13 @@ class FakePhone:
         self.deviceidle: Set[str] = set()             # user battery-optimisation whitelist
         self.standby: Dict[str, int] = {}             # app standby buckets (default 30 frequent)
         self.started: List[str] = []                  # `am start` log
+        self.logcat: List[str] = [
+            "09-25 12:00:00.100  1000  1000 I ActivityManager: Start proc com.android.launcher",
+            "09-25 12:00:01.200  4321  4321 D WhatsApp: connecting",
+            "09-25 12:00:01.300  4321  4330 W WhatsApp: socket timeout, retrying",
+            "09-25 12:00:02.000  4321  4321 E WhatsApp: killed by OplusAthenaAmManager",
+            "09-25 12:00:02.500  1000  1100 I OplusHansManager: freeze com.whatsapp",
+        ]
         self.side_effects: Dict[str, Callable[["FakePhone"], None]] = {}
         self.log: List[str] = []                      # every shell command received
         self.host_log: List[str] = []                 # host commands (simulated, never executed)
@@ -464,6 +471,12 @@ class SimBackend:
         else:
             self.phone.add(pkg, system=False, perms={"android.permission.POST_NOTIFICATIONS": False})
         return _ok("Performing Streamed Install\nSuccess")
+
+    def stream_host(self, args: List[str]) -> List[str]:
+        """`adb -s S logcat -v threadtime [--pid=N] ['*:E']` -> the simulated log buffer."""
+        self.phone.host_log.append(" ".join(args))
+        pid = next((a.split("=", 1)[1] for a in args if a.startswith("--pid=")), None)
+        return [ln for ln in self.phone.logcat if pid is None or f" {pid} " in ln]
 
     def _unsupported(self, cmd: str) -> RunResult:
         return R(EXIT_NOT_FOUND, "", f"sim: unsupported: {cmd}", 0)
