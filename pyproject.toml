@@ -47,6 +47,11 @@ target-version = "py39"
 # legacy/cnrom_fix.py is the frozen behavioural reference (retired tool) - not linted, not edited.
 extend-exclude = ["legacy"]
 
+[tool.ruff.lint]
+# The classic ruff defaults, pinned: ruff 0.16 widened its default set (pyupgrade etc.), which would demand
+# `X | None` / `list[...]` annotations that Python 3.9 cannot evaluate at runtime (CLAUDE.md code rules).
+select = ["E4", "E7", "E9", "F"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
