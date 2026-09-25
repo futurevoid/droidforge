@@ -72,3 +72,70 @@ def test_refused_grant_is_reported(sim, phone: FakePhone) -> None:
     rep = executor.run(powerperms.preset_plan(sim, ["tasker"]), sim, yes)
     sim.backend._pm_perm = orig
     assert rep.status == "done" and not rep.results[0].ok and "refused" in rep.results[0].err
+
+
+# ---------------------------------------------------------------- picking apps
+def test_parse_selection() -> None:
+    items = ["a.one", "b.two", "c.three", "d.four", "e.five"]
+    assert keepalive.parse_selection("1,3", items) == ["a.one", "c.three"]
+    assert keepalive.parse_selection("2-4 1", items) == ["b.two", "c.three", "d.four", "a.one"]
+    assert keepalive.parse_selection("9, x, com.whatsapp", items) == ["com.whatsapp"]
+    assert keepalive.parse_selection("all", items) == items and keepalive.parse_selection("", items) == []
+
+
+def test_statuses_are_batched(sim, phone: FakePhone) -> None:
+    executor.run(keepalive.keepalive_plan(sim, ["com.whatsapp"]), sim, yes)
+    phone.deviceidle.add("com.tencent.mm")
+    pkgs = keepalive.candidates(sim)
+    n = len(phone.log)
+    st = keepalive.statuses(sim, pkgs)
+    assert st["com.whatsapp"] == "kept alive" and st["com.tencent.mm"] == "partly" and st["org.telegram.messenger"] == ""
+    assert len(phone.log) - n <= 3
+
+
+def test_cli_picker(monkeypatch, capsys, df_home) -> None:
+    from droidforge import cli
+    from droidforge.adb.sim import neo8_cn
+    from droidforge.session import open_session
+    phone = neo8_cn()
+    monkeypatch.setattr(cli, "SESSION_FACTORY", lambda **kw: open_session(phone=phone, **kw))
+    items = sorted(p for p, pk in phone.packages.items() if not pk.system)
+    picks = iter([f"{items.index('com.whatsapp') + 1},{items.index('org.telegram.messenger') + 1}"])
+    monkeypatch.setattr("builtins.input", lambda q: next(picks))
+    assert cli.main(["-q", "--simulate", "--yes", "keepalive"]) == 0
+    out = capsys.readouterr().out
+    assert " 1) " in out and "Pick apps" not in out   # prompt went to input(), the list to stdout
+    assert {"com.whatsapp", "org.telegram.messenger"} <= phone.deviceidle
+    monkeypatch.setattr("builtins.input", lambda q: "")
+    assert cli.main(["-q", "--simulate", "--yes", "keepalive"]) == 1   # Enter = cancel, nothing sent
+    out = capsys.readouterr().out
+    assert "[kept alive]" in out
+
+
+async def test_tui_search_keeps_selection_and_shows_status(df_home) -> None:
+    from droidforge.adb.sim import neo8_cn
+    from droidforge.tui.app import DroidforgeApp
+    from droidforge.tui.screens.common import AppPicker
+    phone = neo8_cn()
+    phone.deviceidle.add("com.tencent.mm")
+    app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
+    async with app.run_test(size=(140, 44)) as pilot:
+        await pilot.pause(0.3)
+        await app.workers.wait_for_complete()
+        app.show_section("keepalive")
+        await pilot.pause(0.3)
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        picker = app.query_one("#ka-apps", AppPicker)
+        assert picker.status["com.tencent.mm"] == "partly"
+        picker.select("com.whatsapp")
+        picker.query_one("Input").value = "telegram"
+        await pilot.pause()
+        from textual.widgets import SelectionList
+        sl = picker.query_one(SelectionList)
+        assert sl.option_count == 1
+        sl.select_all()
+        await pilot.pause()
+        picker.query_one("Input").value = ""
+        await pilot.pause()
+        assert picker.picked() == ["com.whatsapp", "org.telegram.messenger"]

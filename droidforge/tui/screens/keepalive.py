@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -40,11 +40,14 @@ class KeepAliveSection(Section):
     def refresh_from(self, app: "DroidforgeApp") -> None:
         dev = self.device
         if dev is not None:
-            app.background(lambda: (sorted(dev.packages("-3")), powerperms.installed_presets(dev)), self.show)
+            def read() -> Tuple[List[str], Dict[str, str], List[str]]:
+                pkgs = keepalive.candidates(dev)
+                return pkgs, keepalive.statuses(dev, pkgs), powerperms.installed_presets(dev)
+            app.background(read, self.show)
 
-    def show(self, res: Tuple[List[str], List[str]]) -> None:
-        pkgs, presets = res
-        self.query_one(AppPicker).load(pkgs)
+    def show(self, res: Tuple[List[str], Dict[str, str], List[str]]) -> None:
+        pkgs, status, presets = res
+        self.query_one(AppPicker).load(pkgs, status)
         self.presets = presets
         self.query_one("#pp-presets-btn", Button).label = (
             "Grant presets: " + ", ".join(CATALOG[k].name for k in presets)) if presets else "No preset apps installed"
@@ -56,9 +59,10 @@ class KeepAliveSection(Section):
         picked = self.query_one(AppPicker).picked()
         bid = event.button.id
         if bid == "ka-on":
-            app.run_plan(lambda: keepalive.keepalive_plan(dev, picked, None, app.expert))
+            app.run_plan(lambda: keepalive.keepalive_plan(dev, picked, None, app.expert),
+                         on_done=lambda rep: self.refresh_from(app))
         elif bid == "ka-off":
-            app.run_plan(lambda: keepalive.remove_plan(dev, picked))
+            app.run_plan(lambda: keepalive.remove_plan(dev, picked), on_done=lambda rep: self.refresh_from(app))
         elif bid == "pp-grant":
             perms = [n for n in powerperms.PERMS if self.query_one(f"#pp-{n}", Checkbox).value]
             app.run_plan(lambda: powerperms.grant_plan(dev, {p: perms for p in picked}, None, app.expert))

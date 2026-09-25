@@ -224,7 +224,7 @@ async def settle(app: DroidforgeApp, pilot, t: float = 0.2) -> None:
 async def run_previewed(app: DroidforgeApp, pilot) -> None:
     for _ in range(50):
         await pilot.pause(0.05)
-        if isinstance(app.screen, PlanPreview):
+        if isinstance(app.screen, PlanPreview) and app.screen.query("#run"):
             break
     assert isinstance(app.screen, PlanPreview), f"no preview, screen is {app.screen!r}"
     app.screen.query_one("#run").press()

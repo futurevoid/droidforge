@@ -29,7 +29,7 @@ droidforge                       # the TUI (d = dry-run, v = verbosity, ctrl+t =
 CLI (every command previews the exact commands + undo and asks `[y/N]`; `--dry-run` sends nothing):
 
 ```
-droidforge keepalive com.whatsapp org.telegram.messenger     # stop ColorOS killing them (+ opens app info)
+droidforge keepalive                  # pick apps from a numbered list (or name them: keepalive com.whatsapp ...)
 droidforge telemetry [--force]    droidforge ads [magazine push launcher feed]    droidforge hijack
 droidforge dns [adguard|cloudflare|quad9|mullvad|nextdns --nextdns-id ID|custom --host H|off]
 droidforge debloat disable|force|neuter|remove|enable|restore <pkg>...   (droidforge uad-update first)

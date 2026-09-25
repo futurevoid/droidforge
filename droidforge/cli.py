@@ -5,12 +5,15 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 from droidforge import __version__, config
 from droidforge.engine.health import RESET_ALL_SETTINGS
 from droidforge.engine.plan import Confirmation, Plan
 from droidforge.log import LOG, ascii_safe, console_sink
+
+if TYPE_CHECKING:  # pragma: no cover
+    from droidforge.adb.device import Device
 from droidforge.session import ConnectError, Session, open_session
 
 # tests replace this to hand the CLI a prepared simulated phone
@@ -76,8 +79,8 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     w = sub.add_parser("swap", help="default-app swap (browser, sms, dialer, gallery, files, calendar, ...)")
     w.add_argument("function")
     w.add_argument("--disable-coloros", action="store_true")
-    k = sub.add_parser("keepalive", help="keep picked apps alive in the background")
-    k.add_argument("packages", nargs="+")
+    k = sub.add_parser("keepalive", help="keep picked apps alive in the background (no names: pick from a list)")
+    k.add_argument("packages", nargs="*")
     k.add_argument("--remove", action="store_true")
     pp = sub.add_parser("powerperms", help="grant power permissions")
     pp.add_argument("--preset", nargs="*", default=[])
@@ -219,8 +222,10 @@ def build_plan(args: argparse.Namespace, s: Session) -> Optional[Plan]:
     if c == "swap":
         return defaults.swap_plan(dev, args.function, args.disable_coloros, data, ex)
     if c == "keepalive":
-        return keepalive.remove_plan(dev, args.packages) if args.remove else keepalive.keepalive_plan(
-            dev, args.packages, data, ex)
+        pkgs = args.packages or pick_keepalive(dev, args.remove)
+        if not pkgs:
+            return None
+        return keepalive.remove_plan(dev, pkgs) if args.remove else keepalive.keepalive_plan(dev, pkgs, data, ex)
     if c == "powerperms":
         if args.preset:
             return powerperms.preset_plan(dev, args.preset)
@@ -245,6 +250,26 @@ def build_plan(args: argparse.Namespace, s: Session) -> Optional[Plan]:
     if c == "rollback":
         return s.history.rollback_to(args.id)
     return None
+
+
+def pick_keepalive(dev: "Device", remove: bool, ask: Optional[Callable[[str], str]] = None) -> List[str]:
+    """Numbered list of your apps with their keep-alive status; pick by number (1,4,7 / 2-9 / names)."""
+    from droidforge.features import keepalive
+    items = keepalive.candidates(dev)
+    st = keepalive.statuses(dev, items)
+    if remove:
+        items = [p for p in items if st.get(p)]
+    if not items:
+        print("No apps to pick." if not remove else "No app is kept alive by droidforge.")
+        return []
+    w = len(str(len(items)))
+    for n, p in enumerate(items, 1):
+        print(ascii_safe(f" {n:>{w}}) {p:<48} {('[' + st[p] + ']') if st.get(p) else ''}"))
+    try:
+        text = (ask or input)("Pick apps (e.g. 1,4,7 or 2-9; Enter = cancel): ")
+    except EOFError:
+        return []
+    return keepalive.parse_selection(text, items)
 
 
 def run_cli_plan(s: Session, plan: Plan, yes: bool) -> int:

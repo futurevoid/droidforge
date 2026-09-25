@@ -10,9 +10,11 @@ which adb cannot set - the user switches them on there. droidforge never touches
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, List, Mapping, Optional
+import re
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional
 
 from droidforge.adb import parse
+from droidforge.adb.batch import batch_read
 from droidforge.engine import safety, steps
 from droidforge.engine.plan import Plan, Step
 
@@ -80,3 +82,37 @@ def remove_plan(device: "Device", pkgs: Iterable[str]) -> Plan:
 
 def candidates(device: "Device") -> List[str]:
     return sorted(device.packages("-3"))
+
+
+def statuses(device: "Device", pkgs: Iterable[str]) -> Dict[str, str]:
+    """{pkg: "kept alive" | "partly" | ""} for many apps in a few batched reads (read-only)."""
+    pkgs = list(pkgs)
+    wl = parse.deviceidle_whitelist(device.out("dumpsys deviceidle whitelist"))
+    ops = batch_read(device, pkgs, "cmd appops get $p", label="background mode")
+    buckets = batch_read(device, pkgs, "am get-standby-bucket $p", label="standby bucket")
+    out = {}
+    for p in pkgs:
+        checks = [bool(wl.get(p)), parse.appops(ops.get(p, "")).get("RUN_ANY_IN_BACKGROUND") == "allow",
+                  parse.standby_bucket(buckets.get(p, "").strip()) == "active"]
+        out[p] = "kept alive" if all(checks) else "partly" if any(checks) else ""
+    return out
+
+
+def parse_selection(text: str, items: List[str]) -> List[str]:
+    """Legacy picker syntax: `3`, `1,4,7`, `2-9`, `all`, or package names; unknown tokens are ignored."""
+    picked: List[str] = []
+    for tok in re.split(r"[,\s]+", text.strip()):
+        if not tok:
+            continue
+        m = re.fullmatch(r"(\d+)-(\d+)", tok)
+        if m:
+            a, b = int(m.group(1)), int(m.group(2))
+            picked += [items[i - 1] for i in range(a, b + 1) if 1 <= i <= len(items)]
+        elif tok.isdigit():
+            if 1 <= int(tok) <= len(items):
+                picked.append(items[int(tok) - 1])
+        elif tok.lower() == "all":
+            picked += items
+        elif "." in tok:
+            picked.append(tok)
+    return list(dict.fromkeys(picked))
