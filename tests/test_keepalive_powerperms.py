@@ -19,11 +19,12 @@ def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
                     "cmd appops set com.whatsapp RUN_ANY_IN_BACKGROUND allow",
                     "cmd appops set com.whatsapp RUN_IN_BACKGROUND allow",
                     "cmd appops set com.whatsapp SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS allow",
+                    "cmd appops set com.whatsapp SYSTEM_ALERT_WINDOW allow",
                     "am set-standby-bucket com.whatsapp active",
                     "am set-bg-restriction-level --user 0 com.whatsapp exempted",
                     "am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.whatsapp"]
-    assert plan.steps[4].undo == ["am set-standby-bucket com.whatsapp frequent"]
-    assert plan.steps[5].undo == ["am set-bg-restriction-level --user 0 com.whatsapp adaptive_bucket"]
+    assert plan.steps[5].undo == ["am set-standby-bucket com.whatsapp frequent"]
+    assert plan.steps[6].undo == ["am set-bg-restriction-level --user 0 com.whatsapp adaptive_bucket"]
     assert any("Developer-options" in n for n in plan.notes)
     rep = executor.run(plan, sim, yes, profile=prof, history=h)
     assert rep.status == "done"
@@ -31,6 +32,8 @@ def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
     assert prof.keepalive == ["com.whatsapp"] and phone.started[-1] == "app-info package:com.whatsapp"
     assert keepalive.status(sim, "com.whatsapp") == {"whitelist": "user", "background": "allow", "bucket": "active"}
     assert phone.bg_level["com.whatsapp"] == "exempted"
+    assert phone.packages["com.whatsapp"].appops["SYSTEM_ALERT_WINDOW"] == "allow"
+    assert "pop-ups" in plan.steps[-1].label and any("pop-ups" in n for n in plan.notes)
     assert all(r.effect == "changed" for r in rep.results if r.requested.risk != "read")
     executor.run(h.rollback_to(h.entries()[0].id), sim, yes, profile=prof, history=h)
     assert phone.state() == initial and prof.keepalive == []

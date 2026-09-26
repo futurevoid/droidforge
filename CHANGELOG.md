@@ -9,6 +9,10 @@
 - Fixed: plans stopped with "changed something it should not" when ColorOS updated its own counters mid-plan.
   Reviewed ignore-list additions from the owner's diffs: the wallpaper-engine clock (ticks every 60 s), the unlock
   counter, the last screen-off time and the status-bar keyboard switcher state.
+- Keep-alive also allows "display over other apps" for the apps you pick (undo puts back the previous mode). Apps
+  that react in the background - for example one that plays audio when the phone is unlocked - need it. The note
+  and the app-info step now also point to App info > Permissions > "Show pop-ups while running in background",
+  which ColorOS does not let adb set.
 
 ## 1.1.2 - 2026-09-25
 

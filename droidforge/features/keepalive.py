@@ -6,10 +6,12 @@ Per app:
     am set-standby-bucket <p> active                  (undo: the previous bucket)
     am set-bg-restriction-level --user 0 <p> exempted (Android 13+; undo: the previous level)
     cmd appops set <p> SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS allow   (Android 14+; undo: the previous mode)
+    cmd appops set <p> SYSTEM_ALERT_WINDOW allow      (display over other apps; undo: the previous mode)
 Phone-wide, its own plan so it can be undone on its own (owner opt-in 2026-09-25, never by default):
     child_process_plan - Developer options "Disable child process restrictions" + the phantom-process cap
-then the app's info page opens: ColorOS keeps "Allow background activity" / "Allow auto launch" under Battery usage,
-which adb cannot set - the user switches them on there. droidforge never touches developer options for this.
+then the app's info page opens: ColorOS keeps "Allow background activity" / "Allow auto launch" under Battery
+usage and "Show pop-ups while running in background" under Permissions, which adb cannot set - the user switches
+them on there. droidforge never touches developer options for this.
 """
 
 from __future__ import annotations
@@ -30,7 +32,8 @@ BG_LEVELS = ("unrestricted", "exempted", "adaptive_bucket", "restricted_bucket",
 CHILD_SETTING = "settings_enable_monitor_phantom_procs"
 PHANTOM_MAX = "2147483647"
 MANUAL = ("On the phone, for each app: App info > Battery usage > turn on 'Allow background activity' and 'Allow "
-          "auto launch'; in Recents, lock the app's card. Do NOT turn on any Developer-options switch for this.")
+          "auto launch'; App info > Permissions > allow 'Show pop-ups while running in background' (ColorOS keeps it "
+          "out of adb's reach); in Recents, lock the app's card. Do NOT turn on any Developer-options switch for this.")
 
 
 def status(device: "Device", p: str) -> dict:
@@ -58,7 +61,8 @@ def keepalive_plan(device: "Device", pkgs: Iterable[str], uad: Optional[Mapping[
         ops = parse.appops(device.read(f"cmd appops get {p}").out)
         for op, what, min_sdk in (("RUN_ANY_IN_BACKGROUND", "allow running in the background", 0),
                                   ("RUN_IN_BACKGROUND", "allow background services", 0),
-                                  ("SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS", "exempt from power restrictions", 34)):
+                                  ("SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS", "exempt from power restrictions", 34),
+                                  ("SYSTEM_ALERT_WINDOW", "allow display over other apps", 0)):
             if device.sdk >= min_sdk and ops.get(op) != "allow":
                 st = steps.appop(p, op, "allow", ops.get(op), "keepalive", risk)
                 st.label = f"{p}: {what}"
@@ -74,7 +78,7 @@ def keepalive_plan(device: "Device", pkgs: Iterable[str], uad: Optional[Mapping[
                                    f"am set-bg-restriction-level --user 0 {p} exempted",
                                    [f"am set-bg-restriction-level --user 0 {p} {level}"], "keepalive", p, risk,
                                    touches=[f"bgrestrict:{p}"]))
-        plan.steps.append(Step(f"Open app info of {p} (turn on background activity + auto launch there)",
+        plan.steps.append(Step(f"Open app info of {p} (turn on background activity, auto launch, background pop-ups)",
                                f"am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:{p}",
                                category="keepalive", pkg=p, risk="read"))
     if sel.locked:
