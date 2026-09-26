@@ -98,7 +98,7 @@ def check_startup(device: "Device", profile: "Profile", history: Optional["Histo
     Read-only. None = healthy (or no baseline yet and nothing failing)."""
     now = health.run(device)
     if profile.healthy_baseline:
-        regs = health.compare(HealthReport.from_dict(profile.healthy_baseline), now)
+        regs = health.problems(health.compare(HealthReport.from_dict(profile.healthy_baseline), now), now)
     else:
         regs = [Regression(p.name, p.label, "", p.value, p.detail) for p in now.failing]
     if not regs:

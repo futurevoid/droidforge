@@ -28,7 +28,8 @@ class DoctorReport:
     rows: List[Tuple[str, str]] = field(default_factory=list)
     health: Optional[HealthReport] = None
     failing: List[Probe] = field(default_factory=list)
-    regressions: List[Regression] = field(default_factory=list)   # vs the last healthy baseline
+    regressions: List[Regression] = field(default_factory=list)   # vs the last healthy baseline: real problems
+    changes: List[Regression] = field(default_factory=list)       # values that differ but still pass (info only)
     advice: Tuple[str, ...] = ()
     baseline_saved: Optional[str] = None
 
@@ -47,6 +48,10 @@ class DoctorReport:
         if self.regressions:
             out += ["", "Changed since the last healthy check:"]
             out += [f"  ! {r}" for r in self.regressions]
+        if self.changes:
+            out += ["", "Different since the last check (information, not an error - your own changes, dark mode or "
+                        "wallpaper colours show up here; saved as the new reference):"]
+            out += [f"  - {r}" for r in self.changes]
         if self.healthy:
             out += ["", "Everything droidforge checks looks healthy."]
         else:
@@ -92,7 +97,11 @@ def run(device: "Device", profile: Optional["Profile"] = None, history: Optional
     rep.failing = h.failing
     if profile is not None and profile.healthy_baseline:
         base = HealthReport.from_dict(profile.healthy_baseline)
-        rep.regressions = [r for r in health.compare(base, h) if r.probe != SWITCH_PROBE]
+        regs = [r for r in health.compare(base, h) if r.probe != SWITCH_PROBE]
+        # Owner (2026-09-26): only a probe that now FAILS, or new crashes, is a problem. A value that changed but
+        # still passes (font size, dark mode, accent colour, keyboard) is reported as information.
+        rep.regressions = health.problems(regs, h)
+        rep.changes = [r for r in regs if r not in rep.regressions]
     alerts: List[Regression] = [Regression(p.name, p.label, "", p.value, p.detail) for p in rep.failing]
     rep.advice = health.advice(alerts + rep.regressions)
 

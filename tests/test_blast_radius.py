@@ -128,10 +128,16 @@ def test_volatile_list_never_contains_display_or_forbidden_keys() -> None:
     from droidforge.engine import guard
     from droidforge.engine.snapshot import VOLATILE_KEYS
     display = next(rx for rx, why in guard.FORBIDDEN if "P9b" in why and "settings" in rx)
+    # Reviewed by name (2026-09-26): matches the display pattern only because of the word "colorful"; it is the
+    # ColorOS wallpaper-engine clock (a timestamp that ticks every 60 s), not a display setting.
+    reviewed_not_display = {"setting:global:colorful_engine_system_clock_time"}
     for key in VOLATILE_KEYS:
         kind, ns, name = key.split(":")
         assert kind == "setting"
         cmd = f"settings put {ns} {name} 1"
-        assert not re.search(display, cmd, re.I), f"{key} is a display/UI key (P9b) - never ignorable"
+        if key not in reviewed_not_display:
+            assert not re.search(display, cmd, re.I), f"{key} is a display/UI key (P9b) - never ignorable"
         for rx, why in guard.FORBIDDEN:
+            if key in reviewed_not_display and rx == display:
+                continue
             assert not re.search(rx, cmd, re.I), f"{key} matches Forbidden: {why}"

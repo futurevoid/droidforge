@@ -507,7 +507,7 @@ async def test_unexplained_break_offers_only_manual_path(df_home: Path) -> None:
     app = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
     async with app.run_test(size=SIZE) as pilot:
         await settle(app, pilot)
-    phone.settings["system"]["font_scale"] = "1.3"
+    phone.crash("com.android.settings")   # a real problem droidforge did not cause
     n = len(phone.log)
     app2 = DroidforgeApp(simulate=True, show_limits=False, phone=phone)
     async with app2.run_test(size=SIZE) as pilot:

@@ -51,7 +51,7 @@ def test_break_between_sessions_explained(sim, phone: FakePhone) -> None:
 
 def test_unexplained_break_no_writes(sim, phone: FakePhone) -> None:
     prof, hist = healthy_session_then(phone, sim, disable=0)
-    phone.settings["system"]["font_scale"] = "1.3"
+    phone.crash("com.android.settings")        # a real problem droidforge did not cause
     b = fix.check_startup(sim, prof, hist)
     assert b is not None and not b.explained and b.repair.steps == []
     assert any("will not write anything" in a for a in b.advice())
@@ -100,7 +100,7 @@ def test_cli_fix_unexplained_exits_2_without_writes(monkeypatch: pytest.MonkeyPa
     phone = neo8_cn()
     _cli_with(phone, monkeypatch)
     assert cli.main(["-q", "--simulate", "doctor"]) == 0
-    phone.settings["system"]["font_scale"] = "1.3"
+    phone.crash("com.android.settings")        # a real problem droidforge did not cause
     n = len(phone.log)
     assert cli.main(["-q", "--simulate", "--yes", "fix"]) == 2
     assert "Reset all settings" in capsys.readouterr().out
@@ -116,3 +116,18 @@ def test_cli_confirm_prompt() -> None:
     c = hook(Plan("x", [steps.disable("com.x")], typed=["I UNDERSTAND"]))
     assert c.ok and c.typed == ["I UNDERSTAND"]
     assert not cli.cli_confirm(False, ask=lambda q: "n")(Plan("x", [steps.disable("com.x")])).ok
+
+
+def test_connect_check_ignores_harmless_changes(sim, phone: FakePhone) -> None:
+    """Owner 2026-09-26: a changed accent colour / font size is not a breakage alert on connect."""
+    from droidforge.engine.profile import Profile
+    from droidforge.features import fix
+    prof = Profile.for_device(phone.serial)
+    assert fix.check_startup(sim, prof) is None                      # saves the baseline
+    phone.settings["system"]["font_scale"] = "1.15"
+    phone.config.oem["mMaterialColor"] = "17179869999"               # new wallpaper colour, still valid
+    assert fix.check_startup(sim, prof) is None
+    assert prof.healthy_baseline["font_scale"]["value"] == "1.15"
+    phone.break_ui()                                                 # a real breakage still alerts
+    b = fix.check_startup(sim, prof)
+    assert b is not None and {"settings_home", "permission_ui"} <= {r.probe for r in b.regressions}

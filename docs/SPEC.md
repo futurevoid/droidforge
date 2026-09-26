@@ -181,7 +181,8 @@ turned on on Claude's advice). These override anything below that conflicts with
     test call.
   - Calendar -> Google Calendar; Contacts -> Google Contacts; Notes -> Google Keep
 - **R-6.3** Keep-alive for apps **the user picks**: deviceidle whitelist, `RUN_ANY_IN_BACKGROUND allow`,
-  standby bucket `active`, then open ColorOS's auto-launch/battery screen for the part adb cannot set.
+  standby bucket `active`, display over other apps (`SYSTEM_ALERT_WINDOW allow`), then open ColorOS's app info for
+  the part adb cannot set (auto launch, background activity, pop-ups while running in background).
 - **R-6.4** Power permissions: presets (Tasker, SystemUI Tuner, Automate, MacroDroid - only if installed) + custom
   app/permission: `WRITE_SECURE_SETTINGS`, `READ_LOGS`, `DUMP`, `PACKAGE_USAGE_STATS` (app-op `GET_USAGE_STATS`).
 
@@ -338,7 +339,9 @@ are withdrawn by the owner (2026-09-25).
 | Developer options wording | USB debugging and Wireless debugging may be named (adb connection); every other developer option stays forbidden (P0 exception) |
 | Self-changing settings | A reviewed ignore-list of settings the ROM changes on its own (screen brightness, next alarm): logged and reported, never a stop reason. Display/UI keys (P9b) can never be on it; it grows only from Phase 9 findings |
 | Keep-alive, phone-wide (2026-09-25) | Owner: apps must not be killed. Allowed as a separate opt-in plan, off by default, undoable on its own: "Disable child process restrictions" + the phantom-process cap (the background CPU limit was considered and dropped by the owner). Per-app keep-alive adds RUN_IN_BACKGROUND, the Android 13+ restriction level `exempted` and the Android 14+ power-restriction exemption. Every plan prints its own undo command and recovery script |
+| Keep-alive pop-ups (2026-09-26) | Owner: apps that react in the background (e.g. play audio on unlock) also need "display over other apps"; per-app keep-alive adds `SYSTEM_ALERT_WINDOW allow` (undo: previous mode). ColorOS's "Show pop-ups while running in background" is not adb-writable, so the plan's note sends the user to App info > Permissions |
 | Doctor and the switch (2026-09-25) | Owner: `doctor` no longer checks or mentions the "Disable permission monitoring" switch (kept on for Shizuku when needed). The executor health gate and the TUI breakage check still read it (R-11.7 #6) |
+| Doctor / connect check: problems only (2026-09-26) | Owner: between sessions only a probe that now fails, new crashes or (at connect) the permission-monitoring switch are problems. Changed-but-passing values (font size, dark mode, accent colour, keyboard) are information and become the new reference. Settings being open or closed is never a change. Self-changing ColorOS keys from the owner's diffs join the reviewed ignore-list (the wallpaper-engine clock is reviewed by name: a timestamp, not a display setting) |
 | Publishing v1 | PR to main, then tag v1.0.0 on main |
 | v1 scope (2026-09-25, later) | v1 is published with Phases 0-6 and 8; root mode (Phase 7) moves to v2; the real-device validation (Phase 9) is deferred and runs after v1. The V-status commands stay marked V until then |
 | Incident 2026-09-25 | ColorOS "Disable permission monitoring" switch (turned on on Claude's advice) broke Settings; Reset all settings turned it off. Owner confirmed. Owner order: never break anything, never change what doesn't need changing -> P0, P7-P16, R-11.7 #6. Initially blamed on the legacy language setter (kept forbidden as defence in depth). Owner: droidforge must not change anything it does not need to and must not be able to cause this again -> P7-P12, R-3 rewrite, R-11.7/11.8 |

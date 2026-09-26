@@ -205,6 +205,11 @@ VOLATILE_KEYS = {
     "setting:system:screen_brightness": "auto-brightness adjusts it all the time",
     "setting:system:screen_brightness_float": "auto-brightness (float variant)",
     "setting:system:next_alarm_formatted": "the clock app rewrites it when alarms fire",
+    # owner's diffs on the Neo 8 (2026-09-25/26): ColorOS rewrites these by itself
+    "setting:global:colorful_engine_system_clock_time": "ColorOS wallpaper-engine clock, updated every 60 s",
+    "setting:secure:kgd_unlock_count": "counts screen unlocks",
+    "setting:system:com.oplus.appmanager.last_screenoff": "time of the last screen-off",
+    "setting:global:statusbar_input_transfer": "status-bar keyboard switcher state, changes as text fields gain focus",
 }
 
 

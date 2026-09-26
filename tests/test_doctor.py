@@ -52,12 +52,25 @@ def test_break_ui_doctor_prints_failures_and_advice(sim, phone: FakePhone) -> No
 def test_regressions_vs_last_healthy_baseline(sim, phone: FakePhone) -> None:
     prof = Profile.for_device(phone.serial)
     assert doctor.run(sim, prof, None).healthy
-    phone.settings["system"]["font_scale"] = "1.3"   # changed between sessions, droidforge did not do it
+    phone.settings["system"]["font_scale"] = "1.3"   # the user changed it between sessions: information only
     rep = doctor.run(sim, prof, None)
-    assert [r.probe for r in rep.regressions] == ["font_scale"]
-    assert "Changed since the last healthy check:" in "\n".join(rep.lines())
+    assert rep.healthy and rep.regressions == [] and [r.probe for r in rep.changes] == ["font_scale"]
+    assert "information, not an error" in "\n".join(rep.lines())
+    assert prof.healthy_baseline["font_scale"]["value"] == "1.3"   # the new reference: it is not reported again
+    assert doctor.run(sim, prof, None).changes == []
+    phone.crash("com.android.systemui")                # a real problem still is one
+    rep = doctor.run(sim, prof, None)
+    assert [r.probe for r in rep.regressions] == ["crashes"] and not rep.healthy
     assert rep.advice[0].startswith("2) Undo")
-    assert prof.healthy_baseline["font_scale"]["value"] == "1.0"  # a broken state never becomes the baseline
+
+
+def test_settings_process_coming_and_going_is_not_a_change(sim, phone: FakePhone) -> None:
+    prof = Profile.for_device(phone.serial)
+    phone.packages["com.android.settings"].running = True
+    assert doctor.run(sim, prof, None).healthy
+    phone.packages["com.android.settings"].running = False
+    rep = doctor.run(sim, prof, None)
+    assert rep.healthy and rep.regressions == [] and rep.changes == []
 
 
 def test_doctor_does_not_check_the_switch(sim, phone: FakePhone) -> None:
