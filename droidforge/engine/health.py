@@ -188,6 +188,8 @@ def compare(baseline: HealthReport, now: HealthReport, declared: Iterable[str] =
             if cur.ok is False:
                 regs.append(Regression(name, cur.label, base.value, cur.value, PERMISSION_MONITORING_ALERT))
             continue
+        if name.startswith("alive:") and cur.ok is not False:
+            continue  # Settings running or not is not a change anyone made; only "SystemUI is dead" counts
         if name == "crashes":
             new = _crash_increase(base.value, cur.value)
             if new:
@@ -201,6 +203,18 @@ def compare(baseline: HealthReport, now: HealthReport, declared: Iterable[str] =
         elif base.ok is True and cur.ok is False:
             regs.append(Regression(name, cur.label, base.value, cur.value, cur.detail))
     return regs
+
+
+def problems(regs: Iterable[Regression], now: HealthReport) -> List[Regression]:
+    """Between sessions (doctor, the check at connect) only these count (owner, 2026-09-26): a probe that now FAILS,
+    new crashes, or the permission-monitoring switch. A value that changed but still passes (font size, dark mode,
+    accent colour, keyboard) is the user's own business - information, not an error."""
+    out = []
+    for r in regs:
+        p = now.get(r.probe)
+        if r.probe in ("crashes", "permission_monitoring") or (p is not None and p.ok is False):
+            out.append(r)
+    return out
 
 
 # snapshot key <-> probe (for recoveries seen by the blast-radius diff)
