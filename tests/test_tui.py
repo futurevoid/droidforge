@@ -554,6 +554,15 @@ async def test_phase4_sections_run_one_action_each(df_home: Path) -> None:
         press(app, "#ka-on")
         await run_previewed(app, pilot)
         assert "org.telegram.messenger" in phone.deviceidle
+        app.query_one("#ka-apps").select("com.whatsapp")
+        press(app, "#ka-why")
+        for _ in range(50):
+            await pilot.pause()
+            if isinstance(app.screen, MessageBox):
+                break
+        assert isinstance(app.screen, MessageBox) and "Athena" in str(app.screen.body)
+        app.screen.dismiss(None)
+        await pilot.pause()
         press(app, "#datetime")
         await run_previewed(app, pilot)
         assert phone.started[-1] == "android.settings.DATE_SETTINGS"

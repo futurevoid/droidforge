@@ -100,6 +100,8 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     kx.add_argument("--remove", action="store_true")
     kx.add_argument("--child-processes", action="store_true",
                     help="phone-wide, own plan: 'Disable child process restrictions' + unlimited phantom processes")
+    kx.add_argument("--why", action="store_true",
+                    help="read-only: why the apps last died and what helps (no names: the kept-alive apps)")
     pp = sub.add_parser("powerperms", help="grant power permissions")
     pp.add_argument("--preset", nargs="*", default=[])
     pp.add_argument("--app")
@@ -405,6 +407,17 @@ def cmd_audit(s: Session, what: str, as_json: bool, include_all: bool) -> int:
     return 0
 
 
+def cmd_keepalive_why(s: Session, pkgs: Sequence[str]) -> int:
+    from droidforge.features import keepalive
+    pkgs = list(pkgs) or list(s.profile.keepalive)
+    if not pkgs:
+        print("No app is kept alive by droidforge - name the apps: droidforge keepalive --why <package>...")
+        return 1
+    for line in keepalive.why_lines(s.device, pkgs):
+        print(ascii_safe(line))
+    return 0
+
+
 def cmd_history(s: Session) -> int:
     for e in s.history.entries():
         state = "dry-run" if e.dry_run else "undone" if e.undone else "ok" if e.ok else "failed"
@@ -510,6 +523,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
         if args.command == "audit":
             return cmd_audit(s, args.what, args.json, args.all)
+        if args.command == "keepalive" and args.why:
+            return cmd_keepalive_why(s, args.packages)
         if args.command == "uad-update":
             from droidforge.data import uad
             ok, msg = uad.update()

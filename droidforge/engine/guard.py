@@ -49,7 +49,7 @@ PROPVAL = r"[A-Za-z0-9_.:/\-+=,]*"
 ZIP = r"/data/local/tmp/[A-Za-z0-9_.\-]+\.zip"
 
 APPOPS = ("RUN_IN_BACKGROUND|RUN_ANY_IN_BACKGROUND|POST_NOTIFICATION|SYSTEM_ALERT_WINDOW|GET_USAGE_STATS"
-          "|SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS")
+          "|SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS|AUTO_REVOKE_PERMISSIONS_IF_UNUSED|SCHEDULE_EXACT_ALARM")
 APPOP_MODES = "allow|ignore|deny|default|foreground"
 ROLES = r"android\.app\.role\.(?:BROWSER|SMS|DIALER)"
 BUCKETS = "active|working_set|frequent|rare|restricted"
@@ -170,6 +170,8 @@ RULES: Tuple[Rule, ...] = (
     R("open-app-info", rf"am start -a android\.settings\.APPLICATION_DETAILS_SETTINGS -d package:{PKG}",
       ((AP, "Open app info (ColorOS: Battery usage > allow background activity / auto launch)"),)),
     R("appops-get", rf"cmd appops get {PKG}", ((AU, "App-ops"),)),
+    R("hibernation-get", rf"cmd app_hibernation get-state {PKG}", ((AP, "Keep-alive state (read)"),)),
+    R("exit-info", rf"dumpsys activity exit-info {PKG}", ((AP, "Why an app was killed (read)"),)),
     R("proc-net", r"(su -c ')?cat /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6(?(1)')",
       ((AU, "Sockets"),)),
     R("pm-path", rf"pm path {PKG}", ((WS, "Shizuku path"),)),
@@ -225,6 +227,8 @@ RULES: Tuple[Rule, ...] = (
     R("bg-level-get", rf"am get-bg-restriction-level --user 0 {PKG}", ((AP, "Keep-alive"),)),
     R("bg-level-set", rf"am set-bg-restriction-level --user 0 (?P<p>{PKG}) (?:{BG_LEVELS})", ((AP, "Keep-alive"),),
       True, touches=("bgrestrict:{p}",)),
+    R("hibernation-set", rf"cmd app_hibernation set-state (?P<p>{PKG}) (?:true|false)", ((AP, "Keep-alive"),), True,
+      touches=("hibernation:{p}",)),
     # owner opt-in 2026-09-25 (SPEC decision log): "Disable child process restrictions" + the phantom-process cap
     R("phantom-procs", r"settings (?:put global settings_enable_monitor_phantom_procs (?:true|false)"
                        r"|delete global settings_enable_monitor_phantom_procs)",

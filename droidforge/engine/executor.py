@@ -36,7 +36,7 @@ ERR_RE = re.compile(r"(?i)\b(error|exception|failure|unknown package|not install
 BOOT_POLL_S = 2.0
 BOOT_FAIL = "the phone did not come back after the reboot"
 OBSERVABLE = ("setting:", "pkg:", "perm:", "appop:", "applocale:", "ime:enabled:", "launcher", "config:", "fw:", "role:",
-              "deviceidle:", "standby:", "bgrestrict:", "devcfg:", "prop:")
+              "deviceidle:", "standby:", "bgrestrict:", "hibernation:", "devcfg:", "prop:")
 UNOBSERVABLE = ("fw:chain3",)
 PREVIEW_NEW_NAMES = 15   # app names read for a preview; the rest come from the cache or stay unknown   # no getter for the chain switch
 
