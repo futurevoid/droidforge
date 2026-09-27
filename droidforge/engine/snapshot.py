@@ -8,6 +8,7 @@ Every value is flattened to a key in the same vocabulary as `Step.touches` / the
     pkg:<p>:suspended           dumpsys package <p>            (scope packages)
     perm:<p>:<permission>       dumpsys package <p> runtime permissions (scope packages)
     appop:<p>:<OP>              cmd appops get <p>             (scope packages)
+    deviceidle:<p> / standby:<p> / bgrestrict:<p> / hibernation:<p>   keep-alive state  (scope packages)
     applocale:<p>               cmd locale get-app-locales     (user apps + scope; every package when full=True)
     ime:enabled:<id>            ime list -s
     role:<role>                 cmd role get-role-holders (browser / SMS / dialer)
@@ -80,6 +81,8 @@ class Snapshot:
                 f[f"standby:{p}"] = d.get("standby", "")
             if d.get("bgrestrict"):
                 f[f"bgrestrict:{p}"] = d["bgrestrict"]
+            if d.get("hibernation"):
+                f[f"hibernation:{p}"] = d["hibernation"]
         for p, loc in self.app_locales.items():
             f[f"applocale:{p}"] = loc
         for i in self.imes:
@@ -160,6 +163,9 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
         if device.sdk >= 33:
             lvl = device.read(f"am get-bg-restriction-level --user 0 {p}")
             s.details[p]["bgrestrict"] = lvl.out.strip() if lvl.ok else ""
+        if device.sdk >= 31:
+            hib = device.read(f"cmd app_hibernation get-state {p}")
+            s.details[p]["hibernation"] = hib.out.strip() if hib.ok and hib.out.strip() in ("true", "false") else ""
         if fw:
             v = device.out(f"cmd connectivity get-package-networking-enabled {p}")
             if v in ("true", "false"):
@@ -188,7 +194,8 @@ def diff(before: Snapshot, after: Snapshot) -> List[Change]:
     both = set(before.details) & set(after.details)
     changes = []
     for k in sorted(set(a) | set(b)):
-        if k.startswith(("perm:", "appop:", "fw:", "deviceidle:", "standby:", "bgrestrict:")) or k.endswith(":suspended"):
+        if k.startswith(("perm:", "appop:", "fw:", "deviceidle:", "standby:", "bgrestrict:",
+                         "hibernation:")) or k.endswith(":suspended"):
             if k.split(":")[1] not in both:
                 continue
         if k.startswith("applocale:") and (k not in a or k not in b):

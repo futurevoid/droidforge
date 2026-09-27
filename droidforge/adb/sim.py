@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from droidforge.adb.backend import EXIT_NOT_FOUND, RunResult
+from droidforge.adb.parse import EXIT_REASONS
 from droidforge.data.device_keys import PERMISSION_MONITORING_PROP
 
 SIM_SERIAL = "SIMNEO8CN01"
@@ -80,6 +81,7 @@ class Pkg:
     activities: List[str] = field(default_factory=list)
     refuse: Set[str] = field(default_factory=set)             # ops the ROM refuses: disable / suspend / uninstall
     running: bool = False
+    hibernating: bool = False                                 # cmd app_hibernation get-state (per user)
     labels: Dict[str, str] = field(default_factory=dict)      # app name per language ("" = default resources)
 
     @property
@@ -214,6 +216,8 @@ class FakePhone:
         self.standby: Dict[str, int] = {}             # app standby buckets (default 30 frequent)
         self.bg_level: Dict[str, str] = {}            # am *-bg-restriction-level (default adaptive_bucket)
         self.device_config: Dict[str, Dict[str, str]] = {"activity_manager": {}}   # unset keys read "null"
+        # dumpsys activity exit-info, newest first: (timestamp, reason code, subreason, description)
+        self.exit_info: Dict[str, List[Tuple[str, int, str, str]]] = {}
         self.started: List[str] = []                  # `am start` log
         self.logcat: List[str] = [
             "09-25 12:00:00.100  1000  1000 I ActivityManager: Start proc com.android.launcher",
@@ -318,7 +322,7 @@ class FakePhone:
             "settings": copy.deepcopy(self.settings), "props": dict(self.props), "imes": dict(self.imes),
             "roles": copy.deepcopy(self.roles), "fw": (self.firewall_chain3, sorted(self.firewall_blocked)),
             "keepalive": (sorted(self.deviceidle), sorted((k, v) for k, v in self.standby.items() if v != 30),
-                          sorted(self.bg_level.items())),
+                          sorted(self.bg_level.items()), sorted(n for n, p in self.packages.items() if p.hibernating)),
             "device_config": copy.deepcopy(self.device_config),
             "config": self.config.line(), "resolve": dict(self.resolve),
         }
@@ -417,6 +421,8 @@ def neo8_cn() -> FakePhone:
     ph.packages["com.oplus.safecenter"].refuse = {"disable", "suspend"}  # legacy mock: suspend refused too
     ph.packages["com.coloros.prome.service"].refuse = {"disable", "suspend"}  # not locked, ROM refuses both
     ph.packages["com.tencent.mm"].locales = "zh-CN"
+    ph.exit_info["com.whatsapp"] = [("2026-09-25 12:00:02", 13, "", "killed by OplusAthenaAmManager"),
+                                    ("2026-09-25 09:14:40", 10, "", "remove task")]
     ph.imes = {IME_SOGOU: True, IME_BAIDU: True, IME_SECURE: True, IME_GBOARD: False}
     ph.settings["secure"].update({
         "default_input_method": IME_SOGOU, "enabled_input_methods": f"{IME_SOGOU}:{IME_BAIDU}:{IME_SECURE}",
@@ -854,6 +860,14 @@ class SimBackend:
                 return _ok()
         if svc == "appops":
             return self._appops(t[2:])
+        if svc == "app_hibernation" and len(t) >= 4 and t[2] in ("get-state", "set-state"):
+            p = self._pkg(t[3])
+            if p is None:
+                return _fail(f"Package {t[3]} is not installed for user 0", 255)
+            if t[2] == "get-state":
+                return _ok("true" if p.hibernating else "false")
+            p.hibernating = t[4] == "true"
+            return _ok()
         if svc == "connectivity":
             return self._connectivity(t[2:])
         if svc == "uimode" and t[2:] == ["night"]:
@@ -1014,6 +1028,8 @@ class SimBackend:
                        "  max_cached_processes=32\n"
                        "ACTIVITY MANAGER CONFIGURATION (dumpsys activity configuration)\n"
                        f"{self.phone.config.line()}\n  mConfigWillChange: false")
+        if what == "activity" and len(t) == 4 and t[2] == "exit-info":
+            return self._exit_info(t[3])
         if what == "window" and len(t) == 2:
             f = self.phone.focused
             act = COLOROS_LAUNCHER if f == "com.android.launcher" else f"{f}/{f}.MainActivity"
@@ -1041,6 +1057,21 @@ class SimBackend:
         if what == "package" and len(t) == 3:
             return self._dumpsys_package(t[2])
         raise Unsupported(" ".join(t))
+
+    def _exit_info(self, name: str) -> RunResult:
+        p = self._pkg(name)
+        head = "ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)\n"
+        if p is None:
+            return _ok(head)
+        out = [head + f"  package: {name}", f"    Historical Process Exit for uid={p.uid}"]
+        for n, (ts, code, sub, desc) in enumerate(self.phone.exit_info.get(name, [])):
+            out += [f"        ApplicationExitInfo #{n}:",
+                    f"          timestamp={ts}.000 pid={4321 + n} realUid={p.uid} packageUid={p.uid} "
+                    f"definingUid={p.uid} user=0",
+                    f"          process={name} reason={code} ({EXIT_REASONS.get(code, 'UNKNOWN').replace('_', ' ')}) subreason=0 ({sub or 'UNKNOWN'}) status=0",
+                    f"          importance=400 pss=0.00 rss=0.00 description={desc or 'null'} state=empty "
+                    "trace=null"]
+        return _ok("\n".join(out))
 
     def _dumpsys_package(self, name: str) -> RunResult:
         p = self._pkg(name)

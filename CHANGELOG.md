@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.4 - 2026-09-27
+
+- Keep-alive does everything else adb can do so the apps you pick are not stopped, each undone to what it was:
+  "Pause app activity if unused" off (Android 11+), the app woken from hibernation if it is in it (Android 12+),
+  and exact alarms allowed for apps that ask for them (Android 12+) - prayer-time and alarm apps need these.
+- New, read-only: `droidforge keepalive --why [apps]` (TUI: "Why was it killed?") shows why each app last died -
+  swiped out of Recents / "Clear all", ColorOS's app killer (Athena), low memory, a crash - and what helps. With no
+  names it checks the apps droidforge keeps alive.
+- ColorOS's own "Allow background activity", "Allow auto launch" and background pop-ups switches still have to be
+  turned on in App info; adb cannot set them, and droidforge does not disable ColorOS's app killer.
+
 ## 1.1.3 - 2026-09-26
 
 - Fixed: doctor and the check at connect flagged harmless things as "changed". Only real problems count now: a

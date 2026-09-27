@@ -119,3 +119,40 @@ def deviceidle_whitelist(out: str) -> Dict[str, str]:
         if len(parts) >= 2 and parts[0] in ("user", "system", "system-excidle"):
             res.setdefault(parts[1], parts[0])
     return res
+
+
+# ApplicationExitInfo.REASON_* codes (AOSP); `dumpsys activity exit-info` prints the code and a label whose wording
+# varies between releases, so the code is what counts.
+EXIT_REASONS = {0: "UNKNOWN", 1: "EXIT_SELF", 2: "SIGNALED", 3: "LOW_MEMORY", 4: "CRASH", 5: "CRASH_NATIVE",
+                6: "ANR", 7: "INITIALIZATION_FAILURE", 8: "PERMISSION_CHANGE", 9: "EXCESSIVE_RESOURCE_USAGE",
+                10: "USER_REQUESTED", 11: "USER_STOPPED", 12: "DEPENDENCY_DIED", 13: "OTHER", 14: "FREEZER",
+                15: "PACKAGE_STATE_CHANGE", 16: "PACKAGE_UPDATED"}
+
+
+def exit_info(out: str) -> List[Dict[str, str]]:
+    """`dumpsys activity exit-info <p>` -> [{ts, process, reason, subreason, description}], newest first."""
+    res: List[Dict[str, str]] = []
+    cur: Dict[str, str] = {}
+    for line in out.splitlines():
+        if re.match(r"\s*ApplicationExitInfo #\d+:", line):
+            cur = {"ts": "", "process": "", "reason": "UNKNOWN", "subreason": "", "description": ""}
+            res.append(cur)
+            continue
+        if not cur:
+            continue
+        m = re.search(r"\btimestamp=(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)", line)
+        if m:
+            cur["ts"] = m.group(1)
+        m = re.search(r"\bprocess=(\S+)", line)
+        if m:
+            cur["process"] = m.group(1)
+        m = re.search(r"\breason=(\d+)", line)
+        if m:
+            cur["reason"] = EXIT_REASONS.get(int(m.group(1)), "UNKNOWN")
+        m = re.search(r"\bsubreason=\d+ \(([^)]*)\)", line)
+        if m and m.group(1) != "UNKNOWN":
+            cur["subreason"] = m.group(1)
+        m = re.search(r"\bdescription=(.*?)(?=\s+state=|\s+trace=|$)", line)
+        if m and m.group(1) != "null":
+            cur["description"] = m.group(1).strip()
+    return res

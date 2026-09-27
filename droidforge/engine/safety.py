@@ -30,7 +30,7 @@ TYPED_EXPERT_TIER = "YES"
 HOME_CMD = "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 
 # touch key prefixes that name a package: pkg:<p>:..., perm:<p>:..., appop:<p>:..., applocale:<p>, fw:<p>, ...
-_PKG_TOUCH = re.compile(r"^(?:pkg|perm|appop|applocale|fw|proc|deviceidle|standby):([A-Za-z0-9_.]+)")
+_PKG_TOUCH = re.compile(r"^(?:pkg|perm|appop|applocale|fw|proc|deviceidle|standby|bgrestrict|hibernation):([A-Za-z0-9_.]+)")
 
 
 @dataclass(frozen=True)

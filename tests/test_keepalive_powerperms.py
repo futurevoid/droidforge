@@ -11,6 +11,9 @@ from tests.helpers import yes
 
 
 def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
+    wa = phone.packages["com.whatsapp"]
+    wa.perms[keepalive.EXACT_ALARM] = True     # asks for exact alarms
+    wa.hibernating = True
     initial = phone.clone().state()
     prof, h = Profile.for_device(phone.serial), History(phone.serial)
     plan = keepalive.keepalive_plan(sim, ["com.whatsapp"])
@@ -20,11 +23,16 @@ def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
                     "cmd appops set com.whatsapp RUN_IN_BACKGROUND allow",
                     "cmd appops set com.whatsapp SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS allow",
                     "cmd appops set com.whatsapp SYSTEM_ALERT_WINDOW allow",
+                    "cmd appops set com.whatsapp AUTO_REVOKE_PERMISSIONS_IF_UNUSED ignore",
+                    "cmd appops set com.whatsapp SCHEDULE_EXACT_ALARM allow",
+                    "cmd app_hibernation set-state com.whatsapp false",
                     "am set-standby-bucket com.whatsapp active",
                     "am set-bg-restriction-level --user 0 com.whatsapp exempted",
                     "am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.whatsapp"]
-    assert plan.steps[5].undo == ["am set-standby-bucket com.whatsapp frequent"]
-    assert plan.steps[6].undo == ["am set-bg-restriction-level --user 0 com.whatsapp adaptive_bucket"]
+    assert plan.steps[5].undo == ["cmd appops set com.whatsapp AUTO_REVOKE_PERMISSIONS_IF_UNUSED default"]
+    assert plan.steps[7].undo == ["cmd app_hibernation set-state com.whatsapp true"]
+    assert plan.steps[8].undo == ["am set-standby-bucket com.whatsapp frequent"]
+    assert plan.steps[9].undo == ["am set-bg-restriction-level --user 0 com.whatsapp adaptive_bucket"]
     assert any("Developer-options" in n for n in plan.notes)
     rep = executor.run(plan, sim, yes, profile=prof, history=h)
     assert rep.status == "done"
@@ -32,7 +40,8 @@ def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
     assert prof.keepalive == ["com.whatsapp"] and phone.started[-1] == "app-info package:com.whatsapp"
     assert keepalive.status(sim, "com.whatsapp") == {"whitelist": "user", "background": "allow", "bucket": "active"}
     assert phone.bg_level["com.whatsapp"] == "exempted"
-    assert phone.packages["com.whatsapp"].appops["SYSTEM_ALERT_WINDOW"] == "allow"
+    assert wa.appops["SYSTEM_ALERT_WINDOW"] == "allow" and wa.appops["AUTO_REVOKE_PERMISSIONS_IF_UNUSED"] == "ignore"
+    assert wa.appops["SCHEDULE_EXACT_ALARM"] == "allow" and not wa.hibernating
     assert "pop-ups" in plan.steps[-1].label and any("pop-ups" in n for n in plan.notes)
     assert all(r.effect == "changed" for r in rep.results if r.requested.risk != "read")
     executor.run(h.rollback_to(h.entries()[0].id), sim, yes, profile=prof, history=h)
@@ -43,6 +52,66 @@ def test_keepalive_skips_what_is_already_set(sim, phone: FakePhone) -> None:
     executor.run(keepalive.keepalive_plan(sim, ["com.whatsapp"]), sim, yes)
     again = keepalive.keepalive_plan(sim, ["com.whatsapp"])
     assert [s.risk for s in again.steps] == ["read"]
+
+
+def test_keepalive_extras_only_where_needed(sim, phone: FakePhone) -> None:
+    cmds = [s.cmd for s in keepalive.keepalive_plan(sim, ["com.whatsapp"]).steps]
+    assert not any("SCHEDULE_EXACT_ALARM" in c or "app_hibernation" in c for c in cmds)   # no exact alarms asked
+    phone.props["ro.build.version.sdk"] = "29"
+    sim.forget_props()
+    phone.packages["com.whatsapp"].perms[keepalive.EXACT_ALARM] = True
+    phone.packages["com.whatsapp"].hibernating = True
+    cmds = [s.cmd for s in keepalive.keepalive_plan(sim, ["com.whatsapp"]).steps]
+    assert not any(x in c for c in cmds for x in ("AUTO_REVOKE", "SCHEDULE_EXACT_ALARM", "app_hibernation"))
+    assert keepalive.why_lines(sim, ["com.whatsapp"]) == [
+        "com.whatsapp: no exits recorded (not killed since boot, or Android < 11)"]
+
+
+def test_why_lines_name_the_killer_and_the_fix(sim) -> None:
+    lines = keepalive.why_lines(sim, ["com.whatsapp", "org.telegram.messenger"])
+    assert lines[0] == "com.whatsapp:"
+    assert "OTHER: killed by ColorOS's app killer (Athena)" in lines[1] and "Allow auto launch" in lines[2]
+    assert "USER_REQUESTED" in lines[3] and "lock the app's card in Recents" in lines[4]
+    assert lines[5].startswith("org.telegram.messenger: no exits recorded")
+    assert all(x.isascii() for x in lines)
+
+
+def test_parse_exit_info_real_format() -> None:
+    from droidforge.adb import parse
+    out = """ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)
+Last Timestamp of Persistence Into Persistent Storage: 2026-09-27 10:00:00.000
+  package: salah.rasoulallah.com
+    Historical Process Exit for uid=10231
+        ApplicationExitInfo #0:
+          timestamp=2026-09-27 09:41:12.345 pid=8812 realUid=10231 packageUid=10231 definingUid=10231 user=0
+          process=salah.rasoulallah.com reason=4 (APP CRASH(EXCEPTION)) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=0.00 rss=0.00 description=crash state=empty trace=null
+        ApplicationExitInfo #1:
+          timestamp=2026-09-27 03:02:01.000 pid=7001 realUid=10231 packageUid=10231 definingUid=10231 user=0
+          process=salah.rasoulallah.com:service reason=3 (LOW_MEMORY) subreason=5 (TOO MANY CACHED) status=0
+          importance=400 pss=0.00 rss=0.00 description=null state=empty trace=null
+"""
+    assert parse.exit_info(out) == [
+        {"ts": "2026-09-27 09:41:12", "process": "salah.rasoulallah.com", "reason": "CRASH", "subreason": "",
+         "description": "crash"},
+        {"ts": "2026-09-27 03:02:01", "process": "salah.rasoulallah.com:service", "reason": "LOW_MEMORY",
+         "subreason": "TOO MANY CACHED", "description": ""}]
+    assert parse.exit_info("ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)\n") == []
+
+
+def test_cli_keepalive_why(monkeypatch, capsys, df_home) -> None:
+    from droidforge import cli
+    from droidforge.adb.sim import neo8_cn
+    from droidforge.session import open_session
+    ph = neo8_cn()
+    before = ph.clone().state()
+    monkeypatch.setattr(cli, "SESSION_FACTORY", lambda **kw: open_session(phone=ph, **kw))
+    assert cli.main(["-q", "--simulate", "keepalive", "--why"]) == 1          # nothing kept alive yet
+    assert "No app is kept alive" in capsys.readouterr().out
+    assert cli.main(["-q", "--simulate", "keepalive", "--why", "com.whatsapp"]) == 0
+    out = capsys.readouterr().out
+    assert "Athena" in out and "USER_REQUESTED" in out and out.isascii()
+    assert ph.state() == before                                                 # read-only
 
 
 def test_child_processes_is_its_own_plan_and_undoes_alone(sim, phone: FakePhone, capsys) -> None:
