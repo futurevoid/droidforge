@@ -21,6 +21,7 @@ def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
     assert cmds == ["dumpsys deviceidle whitelist +com.whatsapp",
                     "cmd appops set com.whatsapp RUN_ANY_IN_BACKGROUND allow",
                     "cmd appops set com.whatsapp RUN_IN_BACKGROUND allow",
+                    "cmd appops set com.whatsapp START_FOREGROUND allow",
                     "cmd appops set com.whatsapp SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS allow",
                     "cmd appops set com.whatsapp SYSTEM_ALERT_WINDOW allow",
                     "cmd appops set com.whatsapp AUTO_REVOKE_PERMISSIONS_IF_UNUSED ignore",
@@ -29,10 +30,11 @@ def test_keepalive_steps_and_undo(sim, phone: FakePhone) -> None:
                     "am set-standby-bucket com.whatsapp active",
                     "am set-bg-restriction-level --user 0 com.whatsapp exempted",
                     "am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.whatsapp"]
-    assert plan.steps[5].undo == ["cmd appops set com.whatsapp AUTO_REVOKE_PERMISSIONS_IF_UNUSED default"]
-    assert plan.steps[7].undo == ["cmd app_hibernation set-state com.whatsapp true"]
-    assert plan.steps[8].undo == ["am set-standby-bucket com.whatsapp frequent"]
-    assert plan.steps[9].undo == ["am set-bg-restriction-level --user 0 com.whatsapp adaptive_bucket"]
+    assert plan.steps[3].undo == ["cmd appops set com.whatsapp START_FOREGROUND default"]
+    assert plan.steps[6].undo == ["cmd appops set com.whatsapp AUTO_REVOKE_PERMISSIONS_IF_UNUSED default"]
+    assert plan.steps[8].undo == ["cmd app_hibernation set-state com.whatsapp true"]
+    assert plan.steps[9].undo == ["am set-standby-bucket com.whatsapp frequent"]
+    assert plan.steps[10].undo == ["am set-bg-restriction-level --user 0 com.whatsapp adaptive_bucket"]
     assert any("Developer-options" in n for n in plan.notes)
     rep = executor.run(plan, sim, yes, profile=prof, history=h)
     assert rep.status == "done"
@@ -63,8 +65,8 @@ def test_keepalive_extras_only_where_needed(sim, phone: FakePhone) -> None:
     phone.packages["com.whatsapp"].hibernating = True
     cmds = [s.cmd for s in keepalive.keepalive_plan(sim, ["com.whatsapp"]).steps]
     assert not any(x in c for c in cmds for x in ("AUTO_REVOKE", "SCHEDULE_EXACT_ALARM", "app_hibernation"))
-    assert keepalive.why_lines(sim, ["com.whatsapp"]) == [
-        "com.whatsapp: no exits recorded (not killed since boot, or Android < 11)"]
+    assert keepalive.why_lines(sim, ["com.whatsapp"])[0] == (
+        "com.whatsapp: no exits recorded (not killed since boot, or Android < 11)")
 
 
 def test_why_lines_name_the_killer_and_the_fix(sim) -> None:
@@ -72,8 +74,108 @@ def test_why_lines_name_the_killer_and_the_fix(sim) -> None:
     assert lines[0] == "com.whatsapp:"
     assert "OTHER: killed by ColorOS's app killer (Athena)" in lines[1] and "Allow auto launch" in lines[2]
     assert "USER_REQUESTED" in lines[3] and "lock the app's card in Recents" in lines[4]
-    assert lines[5].startswith("org.telegram.messenger: no exits recorded")
-    assert all(x.isascii() for x in lines)
+    assert lines[5] == "  kill log (am_kill):"
+    assert "ColorOS's app killer (Athena) [OplusAthenaAmManager]" in lines[6] and "Allow auto launch" in lines[7]
+    assert "force-stopped" in lines[8] and "[remove task]" in lines[8] and "Recents" in lines[9]
+    assert lines[10].startswith("org.telegram.messenger: no exits recorded")
+    assert "cached-app limit" in lines[12] and "[cached #33]" in lines[12] and "keepalive --phone-wide" in lines[13]
+    assert len(lines) == 14 and all(x.isascii() for x in lines)
+
+
+def test_why_lines_warn_without_google_play_services(sim, phone: FakePhone) -> None:
+    phone.packages["com.google.android.gms"].present = False
+    assert keepalive.why_lines(sim, ["com.whatsapp"])[-1] == keepalive.NO_GMS
+    assert keepalive.NO_GMS in keepalive.keepalive_plan(sim, ["com.whatsapp"]).notes
+    assert keepalive.why_lines(sim, []) == []
+
+
+def test_phone_wide_plan_and_one_click_undo(sim, phone: FakePhone) -> None:
+    phone.settings["global"]["cached_apps_freezer"] = "enabled"
+    phone.device_config["activity_manager"]["max_cached_processes"] = "32"
+    initial = phone.clone().state()
+    prof, h = Profile.for_device(phone.serial), History(phone.serial)
+    executor.run(keepalive.keepalive_plan(sim, ["com.whatsapp"]), sim, yes, profile=prof, history=h)
+    after_apps = phone.clone().state()
+    plan = keepalive.phone_wide_plan(sim)
+    assert [s.cmd for s in plan.steps] == [
+        "device_config set_sync_disabled_for_tests persistent",
+        "settings put global settings_enable_monitor_phantom_procs false",
+        "device_config put activity_manager max_phantom_processes 2147483647",
+        "device_config put activity_manager max_cached_processes 128",
+        "settings put global cached_apps_freezer disabled"]
+    assert [s.undo for s in plan.steps] == [
+        ["device_config set_sync_disabled_for_tests none"],
+        ["settings delete global settings_enable_monitor_phantom_procs"],
+        ["device_config delete activity_manager max_phantom_processes"],
+        ["device_config put activity_manager max_cached_processes 32"],
+        ["settings put global cached_apps_freezer enabled"]]
+    assert all(s.risk == "risky" and s.pkg is None for s in plan.steps)
+    assert any("--phone-wide-undo" in n for n in plan.notes) and any("Reboot" in n for n in plan.notes)
+    rep = executor.run(plan, sim, yes, profile=prof, history=h)
+    assert rep.status == "done" and all(r.effect == "changed" for r in rep.results)
+    assert phone.devcfg_sync == "persistent" and phone.settings["global"]["cached_apps_freezer"] == "disabled"
+    assert set(prof.keepalive_prev) == {s.touches[0] for s in plan.steps}
+    assert not keepalive.phone_wide_plan(sim).steps                     # nothing left to do
+    # the one-click undo: back to exactly what was there before, the per-app keep-alive stays
+    undo = keepalive.phone_wide_undo_plan(sim, prof.keepalive_prev)
+    assert [s.cmd for s in undo.steps] == [
+        "settings put global cached_apps_freezer enabled",
+        "device_config put activity_manager max_cached_processes 32",
+        "device_config delete activity_manager max_phantom_processes",
+        "settings delete global settings_enable_monitor_phantom_procs",
+        "device_config set_sync_disabled_for_tests none"]
+    assert executor.run(undo, sim, yes, profile=prof, history=h).status == "done"
+    assert phone.state() == after_apps and phone.state() != initial and prof.keepalive_prev == {}
+    assert not keepalive.phone_wide_undo_plan(sim, prof.keepalive_prev).steps
+
+
+def test_phone_wide_undo_without_a_record_goes_to_defaults(sim, phone: FakePhone) -> None:
+    executor.run(keepalive.phone_wide_plan(sim), sim, yes)             # profile lost / applied elsewhere
+    phone.device_config["activity_manager"]["max_cached_processes"] = "64"   # the user changed it since
+    undo = keepalive.phone_wide_undo_plan(sim)
+    assert [s.cmd for s in undo.steps] == [
+        "settings delete global cached_apps_freezer",
+        "device_config delete activity_manager max_phantom_processes",
+        "settings delete global settings_enable_monitor_phantom_procs",
+        "device_config set_sync_disabled_for_tests none"]
+    executor.run(undo, sim, yes)
+    assert phone.device_config["activity_manager"] == {"max_cached_processes": "64"}
+    assert phone.devcfg_sync == "none" and "cached_apps_freezer" not in phone.settings["global"]
+
+
+def test_phone_wide_skips_what_the_android_version_lacks(sim, phone: FakePhone) -> None:
+    phone.props["ro.build.version.sdk"] = "29"
+    sim.forget_props()
+    cmds = [s.cmd for s in keepalive.phone_wide_plan(sim).steps]
+    assert not any("sync" in c or "freezer" in c for c in cmds) and len(cmds) == 3
+
+
+def test_reapply_brings_keepalive_back_after_an_ota(sim, phone: FakePhone) -> None:
+    prof = Profile.for_device(phone.serial)
+    executor.run(keepalive.keepalive_plan(sim, ["com.whatsapp"]), sim, yes, profile=prof)
+    executor.run(keepalive.child_process_plan(sim), sim, yes, profile=prof)
+    assert not [s for s in prof.reapply(sim).steps]                     # nothing to do yet
+    phone.standby["com.whatsapp"] = 40                                  # the bucket decays
+    phone.device_config["activity_manager"].clear()                     # an OTA wipes device_config
+    cmds = [s.cmd for s in prof.reapply(sim).steps]
+    assert cmds == ["am set-standby-bucket com.whatsapp active",
+                    "device_config put activity_manager max_phantom_processes 2147483647"]  # only what was chosen
+    assert "max_cached" not in " ".join(cmds) and "keepalive_prev" not in prof.export()
+
+
+def test_cli_phone_wide_and_undo(monkeypatch, capsys, df_home) -> None:
+    from droidforge import cli
+    from droidforge.adb.sim import neo8_cn
+    from droidforge.session import open_session
+    ph = neo8_cn()
+    before = ph.clone().state()
+    monkeypatch.setattr(cli, "SESSION_FACTORY", lambda **kw: open_session(phone=ph, **kw))
+    assert cli.main(["-q", "--simulate", "--yes", "keepalive", "--phone-wide"]) == 0
+    assert ph.settings["global"]["cached_apps_freezer"] == "disabled" and ph.devcfg_sync == "persistent"
+    assert cli.main(["-q", "--simulate", "--yes", "keepalive", "--phone-wide-undo"]) == 0
+    out = capsys.readouterr().out
+    assert out.isascii() and "Undo just this plan" in out
+    assert ph.state() == before
 
 
 def test_parse_exit_info_real_format() -> None:

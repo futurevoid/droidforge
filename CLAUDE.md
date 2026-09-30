@@ -43,7 +43,9 @@ over adb (no root), with a root mode for Magisk / KernelSU / APatch. Owner: futu
   over all packages, never add a "repair" that toggles settings. If a task seems to need one of these, stop and
   ask the owner.
 - Owner exceptions (docs/SPEC.md P0): USB / Wireless debugging may be named; keep-alive's opt-in phone-wide plans
-  may write "Disable child process restrictions" and `activity_manager max_phantom_processes`. Nothing else.
+  may write "Disable child process restrictions", `activity_manager max_phantom_processes` and (2026-09-30)
+  "Suspend execution for cached apps" (`cached_apps_freezer`), `activity_manager max_cached_processes` and the
+  device_config sync lock - always with a one-click undo. Nothing else.
 - **Never** suggest, require or write the "Disable permission monitoring" / "Disable system optimization"
   developer switch (or any developer option). If ColorOS refuses something without it, the feature is dropped.
 - Critical packages need expert mode (`--expert`, typed name, one per batch, health gate, reboot check). Do not

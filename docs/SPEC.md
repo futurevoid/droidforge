@@ -53,6 +53,11 @@ turned on on Claude's advice). These override anything below that conflicts with
   restrictions"** (`settings_enable_monitor_phantom_procs`) and the `activity_manager` key `max_phantom_processes`,
   in its own opt-in plan (never by default), previewed, with undo to the previous value. The "Disable permission monitoring" switch stays forbidden.
 
+  *Owner exception (2026-09-30):* keep-alive's opt-in phone-wide plan (`keepalive --phone-wide`) may also write
+  the developer option **"Suspend execution for cached apps"** (`cached_apps_freezer`), the `activity_manager` key
+  `max_cached_processes` and the device_config sync lock (`set_sync_disabled_for_tests persistent`), each undone to
+  the previous value, with a one-click undo of the whole phone-wide plan (`keepalive --phone-wide-undo` / TUI).
+
 - **P7 Minimal footprint.** A feature touches only the exact package, setting or app-op the user chose.
   No side changes, no "repair" toggles, no bulk passes over every installed package.
 - **P8 Command allowlist.** The executor only sends device commands that match a template in
@@ -184,7 +189,8 @@ turned on on Claude's advice). These override anything below that conflicts with
   standby bucket `active`, display over other apps (`SYSTEM_ALERT_WINDOW allow`), "Pause app activity if unused" off
   (`AUTO_REVOKE_PERMISSIONS_IF_UNUSED ignore`, and out of hibernation if it is in it), exact alarms for apps that
   ask for them (`SCHEDULE_EXACT_ALARM allow`), then open ColorOS's app info for the part adb cannot set (auto
-  launch, background activity, pop-ups while running in background). Read-only `keepalive --why` reports why each
+  launch, background activity, pop-ups while running in background); also `START_FOREGROUND allow` (2026-09-30).
+  Read-only `keepalive --why` reports why each
   app last died (`dumpsys activity exit-info`) and what helps.
 - **R-6.4** Power permissions: presets (Tasker, SystemUI Tuner, Automate, MacroDroid - only if installed) + custom
   app/permission: `WRITE_SECURE_SETTINGS`, `READ_LOGS`, `DUMP`, `PACKAGE_USAGE_STATS` (app-op `GET_USAGE_STATS`).
@@ -344,6 +350,7 @@ are withdrawn by the owner (2026-09-25).
 | Keep-alive, phone-wide (2026-09-25) | Owner: apps must not be killed. Allowed as a separate opt-in plan, off by default, undoable on its own: "Disable child process restrictions" + the phantom-process cap (the background CPU limit was considered and dropped by the owner). Per-app keep-alive adds RUN_IN_BACKGROUND, the Android 13+ restriction level `exempted` and the Android 14+ power-restriction exemption. Every plan prints its own undo command and recovery script |
 | Keep-alive pop-ups (2026-09-26) | Owner: apps that react in the background (e.g. play audio on unlock) also need "display over other apps"; per-app keep-alive adds `SYSTEM_ALERT_WINDOW allow` (undo: previous mode). ColorOS's "Show pop-ups while running in background" is not adb-writable, so the plan's note sends the user to App info > Permissions |
 | Keep-alive, everything addable (2026-09-27) | Owner: kept-alive apps must never be killed - "add everything addable". Per-app keep-alive adds `AUTO_REVOKE_PERMISSIONS_IF_UNUSED ignore` (Android 11+), `cmd app_hibernation set-state <p> false` when the app is hibernating (Android 12+) and `SCHEDULE_EXACT_ALARM allow` when the app declares that permission (Android 12+), each undone to the previous state; plus the read-only kill-reason report `keepalive --why` (`dumpsys activity exit-info`). Not added: disabling ColorOS's app killer (Athena) - it runs memory management and "Clear all", so it could break the phone; ColorOS's own switches stay manual |
+| Keep-alive, Realme UI 7 handoff (2026-09-30) | Owner: integrate the Realme UI 7 background-kill handoff, lifting P0 for its phone-wide items ("lift and apply but make a one click reverse"). Per-app keep-alive adds `START_FOREGROUND allow`. New opt-in `keepalive --phone-wide` plan: the device_config sync lock, the child-process switch and cap, `max_cached_processes 128`, `cached_apps_freezer disabled` (reboot); one-click undo `keepalive --phone-wide-undo` / TUI button restores each key still at droidforge's value to what the profile recorded before, else the phone's default. `keepalive --why` also reads the `am_kill` lines of the events log and warns when Google Play services are missing (no FCM push). `reapply` (and the OTA prompt) re-applies per-app keep-alive and the phone-wide keys the owner set. Not added (owner: "Don't touch athena"): disabling Athena; HANS stays manual (Battery usage switches, Recents lock) |
 | Doctor and the switch (2026-09-25) | Owner: `doctor` no longer checks or mentions the "Disable permission monitoring" switch (kept on for Shizuku when needed). The executor health gate and the TUI breakage check still read it (R-11.7 #6) |
 | Doctor / connect check: problems only (2026-09-26) | Owner: between sessions only a probe that now fails, new crashes or (at connect) the permission-monitoring switch are problems. Changed-but-passing values (font size, dark mode, accent colour, keyboard) are information and become the new reference. Settings being open or closed is never a change. Self-changing ColorOS keys from the owner's diffs join the reviewed ignore-list (the wallpaper-engine clock is reviewed by name: a timestamp, not a display setting) |
 | Publishing v1 | PR to main, then tag v1.0.0 on main |

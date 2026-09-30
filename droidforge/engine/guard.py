@@ -49,13 +49,16 @@ PROPVAL = r"[A-Za-z0-9_.:/\-+=,]*"
 ZIP = r"/data/local/tmp/[A-Za-z0-9_.\-]+\.zip"
 
 APPOPS = ("RUN_IN_BACKGROUND|RUN_ANY_IN_BACKGROUND|POST_NOTIFICATION|SYSTEM_ALERT_WINDOW|GET_USAGE_STATS"
-          "|SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS|AUTO_REVOKE_PERMISSIONS_IF_UNUSED|SCHEDULE_EXACT_ALARM")
+          "|SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS|AUTO_REVOKE_PERMISSIONS_IF_UNUSED|SCHEDULE_EXACT_ALARM|START_FOREGROUND")
 APPOP_MODES = "allow|ignore|deny|default|foreground"
 ROLES = r"android\.app\.role\.(?:BROWSER|SMS|DIALER)"
 BUCKETS = "active|working_set|frequent|rare|restricted"
 BG_LEVELS = "unrestricted|exempted|adaptive_bucket|restricted_bucket|background_restricted|hibernation"
-# owner opt-in 2026-09-25 (SPEC decision log): the phone-wide keep-alive key, nothing else in activity_manager
-AM_KEYS = r"max_phantom_processes"
+# owner opt-in 2026-09-25 / 2026-09-30 (SPEC decision log): the phone-wide keep-alive keys, nothing else in
+# activity_manager
+AM_KEYS = r"max_phantom_processes|max_cached_processes"
+SYNC_MODES = "none|persistent|until_reboot"
+FREEZER_MODES = "enabled|disabled|device_default"
 
 # `am start -a` is only allowed for these screens (COMMANDS.md Language / Tools "Curated intents" / Health).
 OPENABLE_ACTIONS = (
@@ -161,6 +164,7 @@ RULES: Tuple[Rule, ...] = (
     R("resolve-perms", r"cmd package resolve-activity --brief -a android\.intent\.action\.MANAGE_APP_PERMISSIONS",
       ((HP, "Permission UI"),)),
     R("crash-buffer", r"logcat -b crash -d -t [0-9]{1,4}", ((HP, "Crashes"),)),
+    R("kill-log", r"logcat -b (?:events|main) -d -t [0-9]{1,5}", ((AP, "Why an app was killed (read)"),)),
     R("pidof", rf"pidof {PKG}", ((HP, "Process alive"), (TO, "logcat (host stream)"), (WS, "Shizuku status"))),
     R("connectivity-help", r"cmd connectivity help", ((FW, "Capability probe"),)),
     R("fw-get", rf"cmd connectivity get-package-networking-enabled {PKG}", ((FW, "Read app block state"),)),
@@ -240,6 +244,14 @@ RULES: Tuple[Rule, ...] = (
       ((AP, "Keep-alive, phone-wide (owner opt-in)"),), True, touches=("devcfg:activity_manager:{k}",)),
     R("am-config-delete", rf"device_config delete activity_manager (?P<k>{AM_KEYS})",
       ((AP, "Keep-alive, phone-wide (owner opt-in)"),), True, touches=("devcfg:activity_manager:{k}",)),
+    # owner opt-in 2026-09-30 (SPEC decision log): the cached-app freezer switch and the device_config sync lock
+    R("cached-freezer", rf"settings (?:put global cached_apps_freezer (?:{FREEZER_MODES})"
+                        r"|delete global cached_apps_freezer)",
+      ((AP, "Keep-alive, phone-wide (owner opt-in)"),), True, touches=("setting:global:cached_apps_freezer",)),
+    R("devcfg-sync-get", r"device_config get_sync_disabled_for_tests",
+      ((AP, "Keep-alive, phone-wide (owner opt-in)"),)),
+    R("devcfg-sync-set", rf"device_config set_sync_disabled_for_tests (?:{SYNC_MODES})",
+      ((AP, "Keep-alive, phone-wide (owner opt-in)"),), True, touches=("devcfg:sync:disabled_for_tests",)),
     R("uninstall-user-app", rf"pm uninstall (?P<p>{PKG})", ((AP, "Install APK(s) (host)"),), True,
       touches=("pkg:{p}:installed",), context="user_app"),
     R("shizuku-lib", r"/data/app/[A-Za-z0-9_.~=\-]+(?:/[A-Za-z0-9_.~=\-]+)?/lib/arm64/libshizuku\.so",

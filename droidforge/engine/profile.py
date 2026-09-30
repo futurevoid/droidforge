@@ -26,7 +26,18 @@ if TYPE_CHECKING:  # pragma: no cover
 
 LEGACY_PACKAGE_KEYS = ("disabled", "removed", "suspended", "neutered")
 LEGACY_IGNORED_KEYS = ("english", "english_prev", "device_locale_prev", "system_locales_prev", "fallback")
-DEVICE_KEYS = ("serial", "model", "fingerprint", "healthy_baseline", "healthy_ts")
+DEVICE_KEYS = ("serial", "model", "fingerprint", "healthy_baseline", "healthy_ts", "keepalive_prev")
+# phone-wide keep-alive (owner opt-in 2026-09-25 / 2026-09-30): touch key -> the command droidforge sends.
+# The profile keeps each key's undo from before droidforge, so the one-click undo restores it exactly.
+PHONE_WIDE = {
+    "devcfg:sync:disabled_for_tests": "device_config set_sync_disabled_for_tests persistent",
+    "setting:global:settings_enable_monitor_phantom_procs":
+        "settings put global settings_enable_monitor_phantom_procs false",
+    "devcfg:activity_manager:max_phantom_processes":
+        "device_config put activity_manager max_phantom_processes 2147483647",
+    "devcfg:activity_manager:max_cached_processes": "device_config put activity_manager max_cached_processes 128",
+    "setting:global:cached_apps_freezer": "settings put global cached_apps_freezer disabled",
+}
 
 # (pkg, step) -> reason it must not be re-applied automatically ("" = fine); set by engine.safety (P1.7)
 Vetter = Callable[[str], str]
@@ -54,6 +65,7 @@ class Profile:
     roles_prev: Dict[str, str] = field(default_factory=dict)
     ime_disabled: List[str] = field(default_factory=list)
     keepalive: List[str] = field(default_factory=list)
+    keepalive_prev: Dict[str, str] = field(default_factory=dict)       # phone-wide key -> undo from before droidforge
     powerperms: Dict[str, List[str]] = field(default_factory=dict)
     root: Dict[str, Any] = field(default_factory=lambda: {"modules": [], "props_prev": {}})
     healthy_baseline: Dict[str, Any] = field(default_factory=dict)
@@ -132,6 +144,14 @@ class Profile:
         self._normalise()
 
     def _apply(self, st: Step) -> None:
+        key = next((t for t in st.touches if t in PHONE_WIDE), None)
+        if key is not None:
+            if st.cmd == PHONE_WIDE[key]:
+                if key not in self.keepalive_prev and st.undo:
+                    self.keepalive_prev[key] = st.undo[0]
+            else:
+                self.keepalive_prev.pop(key, None)
+            return
         rule = guard.classify(st.cmd, st.host)
         words = st.cmd.split()
         p = st.pkg or (words[-1] if words else "")
@@ -190,7 +210,7 @@ class Profile:
 
     def is_empty(self) -> bool:
         return not (self.disabled or self.removed or self.suspended or self.neutered or self.ime_disabled
-                    or self.english or self.firewall or self.keepalive or self.powerperms)
+                    or self.english or self.firewall or self.keepalive or self.keepalive_prev or self.powerperms)
 
     # ------------------------------------------------------------------ re-apply (one plan, P14)
     def reapply(self, device: "Device", vet: Optional[Vetter] = None, title: str = "Re-apply saved changes") -> Plan:
@@ -237,6 +257,16 @@ class Profile:
                 cur = parse.app_locales(device.read(f"cmd locale get-app-locales {p} --user 0").out)
                 if cur != tags:
                     plan.steps.append(steps.app_locale(p, tags, cur))
+        if self.keepalive or self.keepalive_prev:
+            from droidforge.features import keepalive   # engine -> feature, lazily (as report.py does)
+            kept = [p for p in self.keepalive if p in installed and allowed(p)]
+            if kept:
+                sub = keepalive.keepalive_plan(device, kept)
+                plan.steps += [st for st in sub.steps if st.risk != "read"]
+                plan.notes += [n for n in sub.notes if n.startswith("Locked")]
+            if self.keepalive_prev:
+                plan.steps += [st for st in keepalive.phone_wide_plan(device).steps
+                               if any(t in self.keepalive_prev for t in st.touches)]
         gone = sorted({*self.disabled, *self.removed, *self.suspended} - present)
         if gone:
             plan.notes.append("Not on the phone any more (nothing to do): " + ", ".join(gone))

@@ -216,6 +216,8 @@ class FakePhone:
         self.standby: Dict[str, int] = {}             # app standby buckets (default 30 frequent)
         self.bg_level: Dict[str, str] = {}            # am *-bg-restriction-level (default adaptive_bucket)
         self.device_config: Dict[str, Dict[str, str]] = {"activity_manager": {}}   # unset keys read "null"
+        self.devcfg_sync = "none"                     # device_config get_sync_disabled_for_tests
+        self.events: List[str] = []                   # logcat -b events (am_kill / am_proc_died)
         # dumpsys activity exit-info, newest first: (timestamp, reason code, subreason, description)
         self.exit_info: Dict[str, List[Tuple[str, int, str, str]]] = {}
         self.started: List[str] = []                  # `am start` log
@@ -313,6 +315,10 @@ class FakePhone:
         c.side_effects = dict(side)
         return c
 
+    @property
+    def sdk(self) -> int:
+        return int(self.props.get("ro.build.version.sdk", "0") or 0)
+
     def state(self) -> dict:
         """Comparable device state (for 'restored exactly' assertions)."""
         return {
@@ -323,7 +329,7 @@ class FakePhone:
             "roles": copy.deepcopy(self.roles), "fw": (self.firewall_chain3, sorted(self.firewall_blocked)),
             "keepalive": (sorted(self.deviceidle), sorted((k, v) for k, v in self.standby.items() if v != 30),
                           sorted(self.bg_level.items()), sorted(n for n, p in self.packages.items() if p.hibernating)),
-            "device_config": copy.deepcopy(self.device_config),
+            "device_config": copy.deepcopy(self.device_config), "devcfg_sync": self.devcfg_sync,
             "config": self.config.line(), "resolve": dict(self.resolve),
         }
 
@@ -423,6 +429,9 @@ def neo8_cn() -> FakePhone:
     ph.packages["com.tencent.mm"].locales = "zh-CN"
     ph.exit_info["com.whatsapp"] = [("2026-09-25 12:00:02", 13, "", "killed by OplusAthenaAmManager"),
                                     ("2026-09-25 09:14:40", 10, "", "remove task")]
+    ph.events = ["09-25 09:14:40.100  1000  1100 I am_kill : [0,4321,com.whatsapp,900,remove task,48212]",
+                 "09-25 11:02:10.300  1000  1100 I am_kill : [0,5120,org.telegram.messenger,985,cached #33,30120]",
+                 "09-25 12:00:02.000  1000  1100 I am_kill : [0,4400,com.whatsapp,915,OplusAthenaAmManager,51000]"]
     ph.imes = {IME_SOGOU: True, IME_BAIDU: True, IME_SECURE: True, IME_GBOARD: False}
     ph.settings["secure"].update({
         "default_input_method": IME_SOGOU, "enabled_input_methods": f"{IME_SOGOU}:{IME_BAIDU}:{IME_SECURE}",
@@ -709,10 +718,21 @@ class SimBackend:
         if t[1:3] == ["-b", "crash"] and "-d" in t:
             n = int(t[t.index("-t") + 1]) if "-t" in t else len(self.phone.crashes)
             return _ok("\n".join(self.phone.crashes[-n:]))
+        if t[1:3] in (["-b", "events"], ["-b", "main"]) and "-d" in t:
+            buf = self.phone.events if t[2] == "events" else self.phone.logcat
+            n = int(t[t.index("-t") + 1]) if "-t" in t else len(buf)
+            return _ok("\n".join(buf[-n:]))
         raise Unsupported(" ".join(t))
 
     # ------------------------------------------------------------------ settings
     def _c_device_config(self, t: List[str]) -> RunResult:
+        if t[1:] == ["get_sync_disabled_for_tests"]:
+            return _ok(self.phone.devcfg_sync) if self.phone.sdk >= 33 else _fail("Unknown command", 1)
+        if t[1] == "set_sync_disabled_for_tests" and len(t) == 3:
+            if self.phone.sdk < 33 or t[2] not in ("none", "persistent", "until_reboot"):
+                return _fail("Invalid sync disabled mode", 1)
+            self.phone.devcfg_sync = t[2]
+            return _ok()
         verb, ns = t[1], t[2]
         table = self.phone.device_config.setdefault(ns, {})
         if verb == "get":

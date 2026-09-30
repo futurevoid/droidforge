@@ -27,9 +27,12 @@ class KeepAliveSection(Section):
             yield Button("Keep picked apps alive", id="ka-on", variant="primary")
             yield Button("Stop keeping alive", id="ka-off")
             yield Button("Why was it killed?", id="ka-why")
-        yield Label("Phone-wide, off by default - its own plan, undo it alone in History", classes="subtitle")
+        yield Label("Phone-wide, off by default - its own plan; undo it in one click below, then reboot",
+                    classes="subtitle")
         with Horizontal(classes="buttons"):
             yield Button("Allow child processes (Disable child process restrictions)", id="ka-child")
+            yield Button("Phone-wide keep-alive (all background limits)", id="ka-wide")
+            yield Button("Undo phone-wide keep-alive", id="ka-wide-undo", variant="error")
         yield Label("Power permissions for the picked app", classes="subtitle")
         with Horizontal(classes="buttons"):
             for name in powerperms.PERMS:
@@ -75,6 +78,11 @@ class KeepAliveSection(Section):
                                                                     "\n".join(lines) or "Pick the apps first.")))
         elif bid == "ka-child":
             app.run_plan(lambda: keepalive.child_process_plan(dev))
+        elif bid == "ka-wide":
+            app.run_plan(lambda: keepalive.phone_wide_plan(dev))
+        elif bid == "ka-wide-undo":
+            prev = dict(app.session.profile.keepalive_prev) if app.session else {}
+            app.run_plan(lambda: keepalive.phone_wide_undo_plan(dev, prev))
         elif bid == "ka-off":
             app.run_plan(lambda: keepalive.remove_plan(dev, picked), on_done=lambda rep: self.refresh_from(app))
         elif bid == "pp-grant":

@@ -46,6 +46,8 @@ Every command previews the exact commands and their undo and asks `[y/N]`; `--dr
 ```
 droidforge keepalive                  # pick apps from a numbered list (or name them: keepalive com.whatsapp ...)
 droidforge keepalive --child-processes # phone-wide opt-in: 'Disable child process restrictions' (own plan)
+droidforge keepalive --phone-wide     # phone-wide opt-in: all background limits off (reboot afterwards)
+droidforge keepalive --phone-wide-undo # one-click undo of the phone-wide keep-alive
 droidforge keepalive --why             # read-only: why kept-alive apps last died and what helps
 droidforge telemetry [--force]    droidforge ads [magazine push launcher feed]    droidforge hijack
 droidforge dns [adguard|cloudflare|quad9|mullvad|nextdns --nextdns-id ID|custom --host H|off]

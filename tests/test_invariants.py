@@ -347,6 +347,20 @@ def sc_child_processes(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     return keepalive.child_process_plan(dev)
 
 
+def sc_phone_wide(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keepalive
+    return keepalive.phone_wide_plan(dev)
+
+
+def sc_phone_wide_undo(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
+    from droidforge.features import keepalive
+    phone.settings["global"]["cached_apps_freezer"] = "disabled"
+    phone.device_config["activity_manager"]["max_cached_processes"] = "128"
+    phone.devcfg_sync = "persistent"
+    return keepalive.phone_wide_undo_plan(dev, {"setting:global:cached_apps_freezer":
+                                                "settings put global cached_apps_freezer enabled"})
+
+
 def sc_keepalive_remove(phone: FakePhone, dev: Device, tmp: Path) -> Plan:
     from droidforge.features import keepalive
     phone.deviceidle.add("com.whatsapp")
@@ -447,6 +461,8 @@ SCENARIOS: Dict[str, Scenario] = {
     "droidforge.features.keepalive.keepalive_plan": sc_keepalive,
     "droidforge.features.keepalive.remove_plan": sc_keepalive_remove,
     "droidforge.features.keepalive.child_process_plan": sc_child_processes,
+    "droidforge.features.keepalive.phone_wide_plan": sc_phone_wide,
+    "droidforge.features.keepalive.phone_wide_undo_plan": sc_phone_wide_undo,
     "droidforge.features.powerperms.grant_plan": sc_powerperms,
     "droidforge.features.powerperms.preset_plan": sc_powerperms_preset,
     "droidforge.features.defaults.swap_plan": sc_swap,

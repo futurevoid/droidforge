@@ -100,6 +100,11 @@ def add_plan_commands(sub: "argparse._SubParsersAction") -> None:
     kx.add_argument("--remove", action="store_true")
     kx.add_argument("--child-processes", action="store_true",
                     help="phone-wide, own plan: 'Disable child process restrictions' + unlimited phantom processes")
+    kx.add_argument("--phone-wide", action="store_true",
+                    help="phone-wide, own plan: the child-process switch and cap + the device_config sync lock, "
+                         "cached-app cap 128 and the cached-app freezer off (reboot afterwards)")
+    kx.add_argument("--phone-wide-undo", action="store_true",
+                    help="one-click undo of every phone-wide keep-alive value droidforge set (reboot afterwards)")
     kx.add_argument("--why", action="store_true",
                     help="read-only: why the apps last died and what helps (no names: the kept-alive apps)")
     pp = sub.add_parser("powerperms", help="grant power permissions")
@@ -267,6 +272,10 @@ def build_plan(args: argparse.Namespace, s: Session) -> Optional[Plan]:
         return defaults.swap_plan(dev, args.function, args.disable_coloros, data, ex)
     if c == "keepalive" and args.child_processes:
         return keepalive.child_process_plan(dev)
+    if c == "keepalive" and args.phone_wide:
+        return keepalive.phone_wide_plan(dev)
+    if c == "keepalive" and args.phone_wide_undo:
+        return keepalive.phone_wide_undo_plan(dev, s.profile.keepalive_prev)
     if c == "keepalive":
         pkgs = args.packages or pick_keepalive(dev, args.remove)
         if not pkgs:
