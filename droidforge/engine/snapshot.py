@@ -14,6 +14,7 @@ Every value is flattened to a key in the same vocabulary as `Step.touches` / the
     role:<role>                 cmd role get-role-holders (browser / SMS / dialer)
     launcher                    resolve-activity HOME
     config:<field>              dumpsys activity | grep -m1 mGlobalConfig
+    devcfg:<ns>:<key>           device_config get (phone-wide keep-alive keys; devcfg:sync:disabled_for_tests)
 
 `diff(before, after)` lists every key whose value differs; the executor flags the ones no step declared.
 """
@@ -38,8 +39,8 @@ NAMESPACES = ("system", "secure", "global")
 HOME_CMD = "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 CONFIG_CMD = "dumpsys activity | grep -m1 mGlobalConfig"
 WATCHED_PROPS = (PERMISSION_MONITORING_PROP,)
-# phone-wide keep-alive key (owner opt-in): the blast-radius diff must see it
-WATCHED_DEVCFG = (("activity_manager", "max_phantom_processes"),)
+# phone-wide keep-alive keys (owner opt-in): the blast-radius diff must see them
+WATCHED_DEVCFG = (("activity_manager", "max_phantom_processes"), ("activity_manager", "max_cached_processes"))
 ROLES = ("android.app.role.BROWSER", "android.app.role.SMS", "android.app.role.DIALER")
 
 
@@ -182,6 +183,8 @@ def take(device: "Device", scope: Iterable[str] = (), full: bool = False) -> Sna
     s.config = parse.global_config(device.read(CONFIG_CMD).out)
     s.props = {p: device.out(f"getprop {p}").strip() for p in WATCHED_PROPS}
     s.devcfg = {f"{ns}/{k}": device.out(f"device_config get {ns} {k}").strip() for ns, k in WATCHED_DEVCFG}
+    if device.sdk >= 33:
+        s.devcfg["sync/disabled_for_tests"] = device.out("device_config get_sync_disabled_for_tests").strip()
     device.log.trace(f"snapshot: {sum(len(t) for t in s.settings.values())} settings, {len(s.packages)} packages, "
                      f"{len(s.details)} detailed, {len(s.app_locales)} app locales, {len(s.imes)} IMEs")
     return s

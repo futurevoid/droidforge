@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.5 - 2026-09-30
+
+- Keep-alive also allows the apps you pick to start foreground services (`START_FOREGROUND`, undo puts back the
+  previous mode).
+- New phone-wide opt-in plan, off by default: `droidforge keepalive --phone-wide` (TUI: "Phone-wide keep-alive").
+  It locks device_config so the ROM cannot reset these values, turns on "Disable child process restrictions" with
+  an unlimited child-process cap, raises the cached-app cap to 128 and turns off "Suspend execution for cached apps"
+  (reboot afterwards). Owner decision 2026-09-30.
+- One-click undo: `droidforge keepalive --phone-wide-undo` (TUI: "Undo phone-wide keep-alive") puts every
+  phone-wide value droidforge set back to what it was before, or to the phone's default. Reboot afterwards.
+- `droidforge keepalive --why` also reads the kill log (`am_kill`): the cached-app limit, excessive CPU, ColorOS's
+  Athena or HANS. It warns when the phone has no Google Play services, as push (FCM) cannot reach closed apps then.
+- `droidforge reapply` and the prompt after a system update now also re-apply keep-alive and the phone-wide values.
+- ColorOS's app killer (Athena) is still not touched.
+
 ## 1.1.4 - 2026-09-27
 
 - Keep-alive does everything else adb can do so the apps you pick are not stopped, each undone to what it was:

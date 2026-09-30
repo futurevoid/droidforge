@@ -563,6 +563,13 @@ async def test_phase4_sections_run_one_action_each(df_home: Path) -> None:
         assert isinstance(app.screen, MessageBox) and "Athena" in str(app.screen.body)
         app.screen.dismiss(None)
         await pilot.pause()
+        press(app, "#ka-wide")
+        await run_previewed(app, pilot)
+        assert phone.settings["global"]["cached_apps_freezer"] == "disabled" and phone.devcfg_sync == "persistent"
+        press(app, "#ka-wide-undo")                          # the one-click undo
+        await run_previewed(app, pilot)
+        assert "cached_apps_freezer" not in phone.settings["global"] and phone.devcfg_sync == "none"
+        assert phone.device_config["activity_manager"] == {}
         press(app, "#datetime")
         await run_previewed(app, pilot)
         assert phone.started[-1] == "android.settings.DATE_SETTINGS"
